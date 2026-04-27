@@ -1,0 +1,2042 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM SHA - Cloud Sync</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .status-prospect { background-color: #dbeafe; color: #1e40af; }
+        .status-client { background-color: #dcfce7; color: #166534; }
+        #contactModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; }
+        #verrouillage { position: fixed; inset: 0; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        
+        /* Version Mobile responsive */
+        @media (max-width: 768px) {
+            thead { display: none; }
+            tr { display: block; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 1rem; background: white; padding: 10px; }
+            td { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem !important; border-bottom: 1px solid #f3f4f6; text-align: right !important; }
+            td::before { content: attr(data-label); font-weight: bold; font-size: 0.7rem; color: #9ca3af; text-transform: uppercase; margin-right: 10px; }
+            .grid-stats { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+
+    <div id="verrouillage">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 max-w-sm w-full text-center">
+            <div class="mb-6">
+                <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl">🔒</span>
+                </div>
+                <h2 class="text-2xl font-black text-gray-800">Accès Restreint</h2>
+                <p class="text-gray-500 text-sm mt-2">Veuillez saisir le mot de passe pour accéder à la base client.</p>
+            </div>
+            <input type="password" id="saisiePassword" placeholder="Mot de passe" 
+                   class="w-full p-3 border rounded-xl mb-2 outline-none focus:ring-2 ring-blue-400 text-center">
+            <p id="erreur" class="text-red-500 text-xs mb-4 font-bold hidden">Mot de passe incorrect</p>
+            <button onclick="validerMotDePasse()" 
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-blue-100">
+                Déverrouiller
+            </button>
+        </div>
+    </div>
+
+    <div id="mainContent" class="hidden p-4 md:p-8">
+        
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <div class="flex items-center gap-3">
+                <div id="statusIndicator" class="w-3 h-3 rounded-full bg-yellow-400"></div>
+				<img src="Logo_SH_titre.png" alt="Logo" class="h-16 w-auto rounded-lg">
+                <h1 class="text-xl font-bold text-gray-800">CRM Stéphane HARMAND</h1>
+            </div>
+			<div>
+				<p class="text-[20px] font-bold text-gray-400 uppercase tracking-widest">
+				<span id="counter" class="text-blue-600">0</span> fiche(s) affichée(s)
+				</p>
+			</div>
+            <div class="flex gap-2">
+				<button onclick="switchView('stats')" class="bg-blue-100 text-black px-6 py-2 rounded-xl font-bold shadow-lg">📊 Dashboard</button>
+				<button onclick="openStatsModal()" class=" hidden bg-blue-100 text-black px-6 py-2 rounded-xl font-bold shadow-lg">📊 Dashboard</button>
+                <button onclick="openModal()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg">+ Nouveau</button>
+                <button onclick="loadFromSheets()" class="bg-gray-100 text-gray-600 p-2 rounded-xl hover:bg-gray-200" title="Synchroniser">🔄</button>
+				<button onclick="exportFilteredData()" class="bg-green-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-green-700 transition">📥 Export fiches</button>
+            </div>
+        </div>
+		
+		<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-center">
+            <div class=" hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">Commissions Estimées</h3>
+                <p id="statCAN" class="text-xl font-black text-gray-800">0 € </p>
+				<p id="statCAB" class="text-l font-black text-gray-800">0 € Brut</p>
+            </div>
+            <div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">VP Total</h3>
+                <p id="statVP" class="text-xl font-black text-gray-800">0 € Annuel</p>
+				<p id="statVPM" class="text-l font-black text-gray-800">0 € Mensuel</p>
+            </div>
+            <div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">VA Total</h3>
+                <p id="statVA" class="text-xl font-black text-gray-800">0 €</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">Pipe Montant</h3>
+                <p id="statPipe" class="text-xl font-black text-gray-800">0 €</p>
+				<p id="statPipeVp" class="text-xl font-black text-gray-800">0 €</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">EC Montant</h3>
+                <p id="statEc" class="text-xl font-black text-gray-800">0 €</p>
+				<p id="statEcVp" class="text-xl font-black text-gray-800">0 €</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">Potentiel Montant</h3>
+                <p id="statPot" class="text-xl font-black text-gray-800">0 €</p>
+				<p id="statPotVp" class="text-xl font-black text-gray-800">0 €</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">Total Global</h3>
+                <p id="statVATot" class="text-xl font-black text-gray-800">0 €</p>
+				<p id="statVPTot" class="text-xl font-black text-gray-800">0 €</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">R1Clt</h3>
+                <p id="txR1Clt" class="text-xl font-black text-gray-800">0 %</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">R2Clt</h3>
+                <p id="txR2Clt" class="text-xl font-black text-gray-800">0 %</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">R2AV</h3>
+                <p id="txR2AV" class="text-xl font-black text-gray-800">0 %</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">R2PER</h3>
+                <p id="txR2PER" class="text-xl font-black text-gray-800">0 %</p>
+            </div>
+			<div class="hidden bg-white p-2 rounded-xl shadow-sm border-l-4 border-blue-500">
+                <h3 class="text-gray-400 text-[15px] font-bold uppercase mb-1">VaMoyClt</h3>
+                <p id="vaMoyClt" class="text-xl font-black text-gray-800">0 €</p>
+            </div>
+            <div class="bg-white p-2 rounded-xl shadow-sm">
+                <h3 class="text-blue-600 text-[15px] font-bold uppercase mb-1">Prospects</h3>
+                <p id="statProspects" class="text-xl font-black text-gray-800">0</p>
+            </div>
+            <div class="bg-white p-2 rounded-xl shadow-sm">
+                <h3 class="text-blue-600 text-[15px] font-bold uppercase mb-1">Clients</h3>
+                <p id="statClients" class="text-xl font-black text-gray-800">0</p>
+			</div>
+			<div class="bg-white p-2 rounded-xl shadow-sm">
+                <h3 class="text-blue-600 text-[15px] font-bold uppercase mb-1">Mise en relation</h3>
+                <p id="statMiseEnRelation" class="text-xl font-black text-gray-800">0</p>
+				
+            </div>
+            <div class="bg-white p-2 rounded-xl shadow-sm border-l-4 border-red-500 cursor-pointer hover:bg-red-50 transition" onclick="toggleFilterRelance()">
+				<h3 class="text-blue-600 text-[15px] font-bold uppercase mb-1">Retards</h3>
+				<p id="statRelances" class="text-xl font-black text-red-600">0</p>
+				<p id="filterRelanceStatus" class="text-[10px] text-red-400 font-bold hidden uppercase">Filtre Actif</p>
+			</div>
+        </div>
+		
+		
+		
+		<div class="hidden grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+        <h3 class="text-blue-600 font-black uppercase text-xs mb-4 tracking-widest">Suivi RDVs</h3>
+        <div class="space-y-4">
+            <div class="flex justify-between items-center">
+                <span class="text-sm font-bold text-gray-600">Total R1</span>
+                <span id="dashR1" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg font-black">0</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-sm font-bold text-gray-600">Total R2</span>
+                <span id="dashR2" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg font-black">0</span>
+            </div>
+			<div class="flex justify-between items-center">
+                <span class="text-sm font-bold text-gray-600">Total R3</span>
+                <span id="dashR3" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg font-black">0</span>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="hidden bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+        <h3 class="text-blue-600 font-black uppercase text-xs mb-4 tracking-widest">Répartition VA & VP par Produit</h3>
+        <table class="w-full text-left text-sm">
+            <thead>
+                <tr class="text-[10px] text-gray-400 uppercase">
+                    <th class="pb-2">Produit</th>
+                    <th class="pb-2 text-right">Total VA</th>
+                    <th class="pb-2 text-right">Total VP</th>
+                </tr>
+            </thead>
+            <tbody class="font-bold text-gray-700">
+                <tr class="border-b"><td class="py-2">AV</td><td id="dashVA_AV" class="text-right">-</td><td id="dashVP_AV" class="text-right text-green-600">-</td></tr>
+                <tr class="border-b"><td class="py-2">PER</td><td id="dashVA_PER" class="text-right">-</td><td id="dashVP_PER" class="text-right text-green-600">-</td></tr>
+                <tr class="border-b"><td class="py-2">SCPI</td><td id="dashVA_SCPI" class="text-right">-</td><td id="dashVP_SCPI" class="text-right text-green-600">-</td></tr>
+                <tr><td class="py-2">IMMO</td><td id="dashVA_IMMO" class="text-right">-</td><td id="dashVP_IMMO" class="text-right text-green-600">-</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+		
+		<div class="bg-white p-4 rounded-2xl shadow-sm mb-6 space-y-4 border border-gray-100">
+		<div id="birthdaySection" class="hidden bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-2xl shadow-sm mb-6 border border-blue-100">
+			<div class="flex items-center gap-2 mb-3">
+				<span class="text-xl">🎂</span>
+				<h3 class="text-blue-800 font-black uppercase text-xs tracking-widest">Anniversaires</h3>
+			</div>
+			<div id="birthdayList" class="flex flex-wrap gap-3">
+			</div>
+		</div>
+            <div class="flex flex-wrap gap-4 items-center">
+                <input type="text" id="searchBar" onkeyup="renderTable()" placeholder="Rechercher nom" class="flex-1 min-w-[280px] p-2.5 border rounded-xl outline-none focus:ring-2 ring-blue-100">
+				<label class="flex items-center gap-2 cursor-pointer font-bold text-sm"><input type="checkbox" id="filterAppel" onchange="renderTable()" class="w-4 h-4 accent-blue-600"> Appels Prio 📞</label>
+				<label class="flex items-center gap-2 cursor-pointer font-bold text-sm"><input type="checkbox" id="filterUdp" onchange="renderTable()" class="w-4 h-4 accent-blue-600"> Liste UDP 👪</label>
+				<label class="flex items-center gap-2 cursor-pointer font-bold text-sm"><input type="checkbox" id="filterHasRelance" onchange="renderTable()" class="w-4 h-4 accent-red-600">Relance 📅</label>
+				<label class="flex items-center gap-2 cursor-pointer font-bold text-sm"><input type="checkbox" id="filterProprio" onchange="renderTable()" class="w-4 h-4 accent-blue-600"> Proprio 🏠</label>
+				<label class="flex items-center gap-2 cursor-pointer font-bold text-sm"><input type="checkbox" id="filterNoir" onchange="renderTable()" class="w-4 h-4 accent-blue-600"> Liste Noire ⬛</label>
+				
+				<select id="filterCampagne" onchange="renderTable()" class="border p-2 rounded-xl text-sm font-bold outline-none">
+					<option value="Tous">Sans filtre Campagne</option>
+				</select>
+                <select id="filterStatut" onchange="renderTable()" class="border p-2 rounded-xl text-sm font-bold outline-none">
+					<option value="Tous">Tous les statuts</option>
+					<option value="Prospect">Prospect</option>
+					<option value="Prospect Rencontré">Prospect Rencontré</option>
+					<option value="Prospect Filleul">Prospect Filleul</option>
+					<option value="Client">Client</option>
+					<option value="Filleul">Filleul</option>
+				</select>
+                
+                <select id="filterTemp" onchange="renderTable()" class="border p-2 rounded-xl text-sm font-bold outline-none">
+                    <option value="Tous">Tout Cercle</option>
+                    <option value="Chaud">Cercle Chaud 🔥</option>
+                    <option value="Tiède">Cercle Tiède 🌤️</option>
+                    <option value="Froid">Cercle Froid ❄️</option>
+                </select>
+                <select id="filterDemarchage" onchange="renderTable()" class="border p-2 rounded-xl text-sm font-bold outline-none">
+                    <option value="Tous">Tout Démarchage</option>
+                    <option value="NQ">NQ</option>
+                    <option value="DM">DM</option>
+                    <option value="R0">RDV</option>
+                </select>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="filterAgeMin" oninput="renderTable()" placeholder="Âge min" class="w-20 p-2.5 border rounded-xl outline-none bg-gray-50 text-sm">
+                    <span class="text-gray-400 text-xs">à</span>
+                    <input type="number" id="filterAgeMax" oninput="renderTable()" placeholder="Âge max" class="w-20 p-2.5 border rounded-xl outline-none bg-gray-50 text-sm">
+                </div>
+            </div>
+			<div class="flex flex-wrap gap-3 border-l pl-4 border-gray-200">
+	<label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+		<input type="checkbox" id="filterR0" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> R0
+    </label>
+    <label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+        <input type="checkbox" id="filterR1" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> R1
+    </label>
+    <label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+        <input type="checkbox" id="filterR2" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> R2
+    </label>
+    <label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+        <input type="checkbox" id="filterR3" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> R3
+    </label>
+    <label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+        <input type="checkbox" id="filterDM" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> DM
+    </label>
+    <label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+        <input type="checkbox" id="filterAD" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> AD
+    </label>
+    <label class="flex items-center gap-1 cursor-pointer text-xs font-bold">
+        <input type="checkbox" id="filterTJ" onchange="renderTable()" class="w-3 h-3 accent-blue-600"> 3J
+    </label>
+</div>
+        </div>
+        
+
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse table-fixed">
+                    <thead class="bg-gray-50 text-[10px] font-black uppercase text-gray-400">
+                        <tr>
+                            <th class="p-4 w-[15%]">Identité</th>
+                            <th class="p-4 w-[10%]">Statut / Étape</th>
+                            <th class="p-4 w-[10%]">Cercle / Démarchage</th>
+                            <th class="p-4 w-[15%]">Contact</th>
+                            <th class="p-4 w-[10%]">Montant</th>
+                            <th class="p-4 text-center w-[20%]">Infos</th>
+                            <th class="p-4 text-center w-[15%]">RDV</th>
+							<th class="p-4 text-center w-[15%]">Relance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="text-sm divide-y divide-gray-50">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+		
+<div id="statsModal" class="hidden p-6 bg-gray-100 min-h-screen">
+    <div>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <h2 class="text-2xl font-black text-gray-800 uppercase tracking-tight">Tableau de Bord Global</h2>
+            <button onclick="switchView('main')" class="bg-gray-800 text-white px-6 py-2 rounded-xl shadow-lg hover:bg-black transition">
+            ← Retour au CRM
+        </button>
+        </div>
+        <div class="p-6 overflow-y-auto space-y-8">
+            <div id="statsContainer"></div>
+			
+
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div id="rdvContainer" class="hidden bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                    <h3 class="text-blue-600 font-black uppercase text-xs mb-4 tracking-widest">Suivi des Étapes</h3>
+                    <div id="rdvList" class="space-y-3 shadow-sm">
+                        </div>
+                </div>
+				<div class="bg-white p-4 rounded-2xl border-t-4 shadow-sm">
+					<h3 class="text-blue-600 font-black uppercase text-xs mb-4 tracking-widest">RDVs faits</h3>
+					<div class="space-y-3">
+						<div onclick="showRdvContacts('R0', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+						<span class="text-sm font-bold text-gray-600">R0</span>
+							<span id="doneR0" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('R1', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+						<span class="text-sm font-bold text-gray-600">R1</span>
+							<span id="doneR1" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('R2', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">R2</span>
+							<span id="doneR2" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('R3', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">R3</span>
+							<span id="doneR3" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('RX', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">Rx</span>
+							<span id="doneRx" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('DM', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">DM</span>
+							<span id="doneDm" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('AD', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">AD</span>
+							<span id="doneAd" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('TJ', 'fait')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">3J</span>
+							<span id="doneTj" class="text-blue-600 font-black">0</span>
+						</div>
+						<div class="flex justify-between items-center pb-1">
+							<span class="text-blue-600 font-black">TOTAL</span>
+							<span id="doneTotal" class="text-blue-600 font-black">0</span>
+						</div>
+					</div>
+				</div>
+				<div class="bg-white p-4 rounded-2xl border-t-4 shadow-sm">
+					<h3 class="text-blue-600 font-black uppercase text-xs mb-4 tracking-widest">RDVs d'avance</h3>
+					<div class="space-y-3">
+						<div onclick="showRdvContacts('R0', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">R0</span>
+							<span id="avanceR0" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('R1', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">R1</span>
+							<span id="avanceR1" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('R2', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">R2</span>
+							<span id="avanceR2" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('R3', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">R3</span>
+							<span id="avanceR3" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('RX', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">Rx</span>
+							<span id="avanceRx" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('DM', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">DM</span>
+							<span id="avanceDm" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('AD', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">AD</span>
+							<span id="avanceAd" class="text-blue-600 font-black">0</span>
+						</div>
+						<div onclick="showRdvContacts('TJ', 'done')" class="flex justify-between items-center border-b pb-1 cursor-pointer hover:bg-blue-50 transition">
+							<span class="text-sm font-bold text-gray-600">3J</span>
+							<span id="avanceTj" class="text-blue-600 font-black">0</span>
+						</div>
+						<div class="flex justify-between items-center pb-1">
+							<span class="text-blue-600 font-black">TOTAL</span>
+							<span id="avanceTotal" class="text-blue-600 font-black">0</span>
+						</div>
+					</div>
+				</div>
+                <div class="bg-white p-4 rounded-2xl border-t-4 shadow-sm">
+                    <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start">Répartition VA par Produit</h3>
+                    <div class="relative w-full h-64 md:h-80">
+                        <canvas id="chartVA"></canvas>
+                    </div>
+                </div>
+				<div class="bg-white p-4 rounded-2xl border-t-4 shadow-sm">
+                    <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start">Répartition VA (%) par Produit</h3>
+                    <div class="relative w-full h-64 md:h-80">
+                        <canvas id="chartVAPour"></canvas>
+                    </div>
+                </div>
+				<div class="bg-white p-4 rounded-2xl border-t-4 shadow-sm">
+				<h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start" id="apporteurs"></h3>
+				<div class="relative w-full h-64 md:h-80">
+					<canvas id="chartApporteurs"></canvas>
+				</div>
+			</div>
+            </div>
+			
+        </div>
+    </div>
+</div>
+		
+    <div id="contactModal">
+        <div class="bg-white w-full max-w-6xl m-3 rounded-3xl shadow-2xl overflow-hidden relative border border-gray-200 flex flex-col max-h-[80vh]">
+            <div class="p-3 border-b flex justify-between items-center bg-gray-50">
+                <h2 id="modalTitle" class="text-xl font-bold text-gray-800">Fiche Contact</h2>
+                <div class="flex items-center gap-4">
+					<label class="text-sm font-bold text-blue-700">Statut :</label>
+					<select id="f_statut_global" onchange="toggleClientFields()" class="border p-1 rounded-lg outline-none text-sm font-bold bg-blue-50 border-blue-200">
+					<option value="Prospect">Prospect</option>
+					<option value="Prospect Rencontré">Prospect Rencontré</option>
+					<option value="Prospect Filleul">Prospect Filleul</option>
+					<option value="Client">Client ✅</option>
+					<option value="Filleul">Filleul</option>
+					</select>
+					<button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+				</div>
+            </div>
+            
+            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-8 max-h-[65vh] overflow-y-auto flex-1">
+                <input type="hidden" id="f_id">
+                
+                <div class="space-y-4">
+                    <h3 class="text-[10px] font-black text-blue-500 uppercase tracking-widest border-b pb-1">Identité & Profil</h3>
+                    <div class="grid grid-cols-2 gap-1">
+                        <input id="f_prenom" type="text" placeholder="Prénom" class="border p-1 rounded-lg outline-none text-xs">
+                        <input id="f_nom" type="text" placeholder="NOM" class="border p-1 rounded-lg outline-none text-xs uppercase font-bold">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="f_genre" class="border p-1 rounded-lg outline-none text-xs">
+                            <option value="">Genre</option>
+                            <option value="Homme">Homme</option>
+                            <option value="Femme">Femme</option>
+                        </select>
+                        <div class="flex gap-1">
+                            <input id="f_anniv" type="datetime-local" onchange="calculerAge()" class="border p-1 rounded-lg outline-none text-xs flex-1">
+                            <input id="f_age" type="number" value="0" placeholder="Age" readonly class="w-10 border rounded-lg bg-gray-50 text-center text-xs font-bold text-blue-600">
+                        </div>
+                    </div>
+                    <select id="f_situfam" class="w-full border p-1 rounded-lg outline-none text-xs">
+                        <option value="">Situation Familiale</option>
+                        <option value="Marie">Marié(e)</option>
+                        <option value="Celibataire">Célibataire</option>
+                        <option value="Pacs">Pacsé(e)</option>
+                        <option value="Union_Libre">Union libre</option>
+                    </select>
+					<div class="bg-indigo-50 p-2 rounded-xl border border-indigo-100">
+						<label class="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Lien Foyer (Conjoint/Enfant)</label>
+						<div class="flex gap-1 mt-1">
+							<input id="f_foyer_nom" type="text" placeholder="Taper le nom pour lier..." class="flex-1 border p-1 rounded-lg outline-none text-xs" onkeyup="rechercheFoyer(this.value)">
+							<input type="hidden" id="f_foyer_id">
+							<button onclick="delierFoyer()" id="btn_delier" class="hidden bg-red-100 text-red-600 px-2 rounded-lg text-[10px] font-bold">Délier</button>
+						</div>
+						<div id="foyer_results" class="hidden bg-white border rounded-lg mt-1 shadow-xl max-h-32 overflow-y-auto z-50"></div>
+						<div id="foyer_status" class="text-[9px] mt-1 font-bold text-indigo-400 italic"></div>
+					</div>
+                    <input id="f_enfants" type="text" placeholder="Enfants (ex: 2 enfants - 4 et 8 ans)" class="w-full border p-1 rounded-lg outline-none text-xs">
+                    <div class="flex items-center justify-between p-1 bg-gray-50 rounded-lg">
+                        <label class="text-xs font-bold text-gray-600">Propriétaire ?</label>
+                        <input type="checkbox" id="f_proprio" class="w-5 h-5 accent-blue-600">
+                    </div>
+                    <input id="f_metier" type="text" placeholder="Métier / CSP" class="w-full border p-1 rounded-lg outline-none text-xs">
+					<div class="bg-red-50 p-1 rounded-2xl border border-red-100">
+                        <label class="text-[10px] font-bold text-red-400 uppercase">Date Relance</label>
+                        <input id="f_relance" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+                    </div>
+					<div class="md:col-span-3 bg-blue-50 p-3 rounded-2xl border border-blue-100">
+						<div class="flex justify-between items-center mb-2">
+						<label class="text-[10px] font-black text-blue-600 uppercase tracking-widest">Journal des Campagnes (Mail / SMS)</label>
+							<div class="flex gap-2">
+							<button onclick="logCampagne('📞 Tel')" class="text-[10px] bg-white border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-100 transition"> + Log Tel </button>
+							<button onclick="logCampagne('📧 Mail')" class="text-[10px] bg-white border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-100 transition"> + Log Mail </button>
+							<button onclick="logCampagne('📱 SMS')" class="text-[10px] bg-white border border-blue-200 px-2 py-1 rounded-lg hover:bg-blue-100 transition"> + Log SMS </button>
+							</div>
+						</div>
+						<textarea id="f_campagnes" placeholder="Dates des envois..." class="w-full border p-2 rounded-xl h-16 outline-none text-[11px] bg-white/50"></textarea>
+					</div>
+                </div>
+
+                <div class="space-y-4">
+                    <h3 class="text-[10px] font-black text-blue-500 uppercase tracking-widest border-b pb-1">Contact & Origine</h3>
+                    <input id="f_tel" type="text" oninput="formaterTelephone(this)" placeholder="Téléphone" class="w-full border p-1 rounded-lg outline-none text-xs">
+                    <input id="f_email" type="email" placeholder="Email" class="w-full border p-1 rounded-lg outline-none text-xs">
+                    <textarea id="f_adresse" placeholder="Adresse complète / Ville" class="w-full border p-1 rounded-lg h-20 outline-none text-xs"></textarea>
+                    
+                    <div class="bg-gray-50 p-1 rounded-2xl border border-gray-100">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Cercle</label>
+                        <select id="f_cercle" class="w-full border p-2 rounded-lg mt-1 font-bold text-xs">
+                            <option value="Froid">Cercle Froid ❄️</option>
+                            <option value="Tiède">Cercle Tiède 🌤️</option>
+                            <option value="Chaud">Cercle Chaud 🔥</option>
+                        </select>
+                    </div>
+                    <div class="bg-blue-50 p-1 rounded-2xl border border-blue-100">
+                        <label class="text-[10px] font-bold text-gray-400 uppercase">Démarchage</label>
+                        <select id="f_demarchage" class="w-full border p-2 rounded-lg mt-1 text-xs">
+                            <option value="NQ">NQ</option>
+                            <option value="R0">RDV</option>
+                            <option value="DM">DM</option>
+                        </select>
+                    </div>
+					<div class="flex items-center justify-between p-1 bg-red-50 rounded-lg">
+                        <label class="text-xs font-bold text-black-600">Appel Prio</label>
+                        <input type="checkbox" id="f_appel" class="w-5 h-5 accent-blue-600">
+                    </div>
+					<div class="flex items-center justify-between p-1 bg-blue-50 rounded-lg">
+                        <label class="text-xs font-bold text-black-600">Appel UDP</label>
+                        <input type="checkbox" id="f_udp" class="w-5 h-5 accent-blue-600">
+                    </div>
+					<div class="flex items-center justify-between p-1 bg-black rounded-lg">
+                        <label class="text-xs font-bold text-white">Liste Noire</label>
+                        <input type="checkbox" id="f_noire" class="w-5 h-5 accent-blue-600">
+                    </div>
+                    
+                </div>
+
+                <div id="clientFields" class="space-y-4 opacity-40 pointer-events-none transition-all">
+                    <h3 class="text-[10px] font-black text-green-600 uppercase tracking-widest border-b pb-1">Suivi Business</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Étape</label>
+                            <select id="f_etape" class="w-full border p-1 rounded-lg text-xs font-bold">
+                                <option>R0</option><option>R1</option><option>R2</option><option>R3</option><option>Rx</option><option>DM</option><option>AD</option><option>3J</option><option>Terminé</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-400 uppercase">Date RDV</label>
+                            <input id="f_daterdv" type="datetime-local" class="w-full border p-1 rounded-lg text-xs">
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-1 rounded-2xl border border-blue-100 space-y-3">
+                        <label class="text-[10px] font-black text-blue-500 uppercase">Solutions & VP</label>
+                        <div class="grid grid-cols-3 gap-2">
+							<span class="text-xs font-bold">AV</span>
+							<input type="number" id="sol_av_m" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg">
+							<input type="number" id="sol_av_v" oninput="calcTotals()" placeholder="VP" class="p-1 text-xs border rounded-lg">
+						</div>
+                        <div class="grid grid-cols-3 gap-2">
+							<span class="text-xs font-bold">PER</span><input type="number" id="sol_per_m" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"><input type="number" id="sol_per_v" oninput="calcTotals()" placeholder="VP" class="p-1 text-xs border rounded-lg"></div>
+                        <div class="grid grid-cols-3 gap-2"><span class="text-xs font-bold">SCPI</span><input type="number" id="sol_scpi_m" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"><input type="number" id="sol_scpi_v" oninput="calcTotals()" placeholder="VP" class="p-1 text-xs border rounded-lg"></div>
+                        <div class="grid grid-cols-3 gap-2"><span class="text-xs font-bold">IMMO</span><input type="number" id="sol_immo_m" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"><input type="number" id="sol_immo_v" oninput="calcTotals()" placeholder="VP" class="p-1 text-xs border rounded-lg"></div>
+                        
+                        <div class="pt-2 border-t border-blue-200 space-y-1">
+                            <div class="flex justify-between font-bold text-blue-700 text-xs"><span>TOTAL VA :</span> <span id="f_totalva_label">0 €</span></div>
+                            <div class="flex justify-between font-bold text-blue-700 text-xs"><span>TOTAL VP :</span> <span id="f_totalvp_label">0 €</span></div>
+                        </div>
+						<div class="pt-2 border-t border-blue-200 space-y-1">
+                            <div class="flex justify-between font-bold text-blue-700 text-xs"><span>PIPE montant :</span><input type="number" id="f_pipe" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"></div>
+                            <div class="flex justify-between font-bold text-blue-700 text-xs"><span>PIPE VP :</span><input type="number" id="f_pipe_vp" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"></div>
+                        
+							<div class="flex justify-between font-bold text-blue-700 text-xs"><span>Potentiel montant :</span><input type="number" id="f_pot" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"></div>
+                            <div class="flex justify-between font-bold text-blue-700 text-xs"><span>Potentiel VP :</span><input type="number" id="f_pot_vp" oninput="calcTotals()" placeholder="Montant" class="p-1 text-xs border rounded-lg"></div>
+                        </div>
+                    </div>
+					<div class="bg-purple-50 p-1 rounded-2xl border border-purple-100">
+						<label class="text-[10px] font-bold text-purple-400 uppercase">Mise en relation par</label>
+						<input id="f_recommandation" type="text" list="listeParrains" placeholder="Rechercher un nom..." class="w-full border p-2 rounded-lg mt-1 text-xs outline-none focus:ring-2 ring-purple-200">
+						<datalist id="listeParrains">
+						</datalist>
+					</div>
+                </div>
+				<div class="md:col-span-3 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+				<label class="text-[10px] font-black text-blue-500 uppercase">RDV</label>
+                <div class="grid grid-cols-8 gap-2">
+                        
+                        <div>
+							<span class="text-xs font-bold">R0</span>
+							<input id="f_r0" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">R1</span>
+							<input id="f_r1" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">R2</span>
+							<input id="f_r2" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">R3</span>
+							<input id="f_r3" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">Rx</span>
+							<input id="f_rx" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">DM</span>
+							<input id="f_dm" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">AD</span>
+							<input id="f_ad" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+						<div>
+							<span class="text-xs font-bold">3J</span>
+							<input id="f_tj" type="datetime-local" class="w-full border p-1 rounded-lg mt-1 text-xs">
+						</div>
+                    </div>
+				</div>
+				<div class="md:col-span-3">
+                    <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b pb-1 mb-2">Notes & Historique</h3>
+                    <textarea id="f_notes" placeholder="Préconisations" class="w-full border p-4 rounded-2xl h-24 outline-none text-sm"></textarea>
+					<textarea id="f_histo" placeholder="Historique" class="w-full border p-4 rounded-2xl h-24 outline-none text-sm"></textarea>
+                </div>
+				
+            </div>
+
+            <div class="p-3 border-t bg-gray-50 flex justify-end gap-3">
+                <button id="btnDelete" onclick="deleteContact()" class="text-red-500 font-bold hover:underline">Supprimer</button>
+                <div class="flex gap-3">
+                    <button onclick="closeModal()" class="px-6 py-2 text-gray-500 font-bold">Annuler</button>
+                    <button id="btnSave" onclick="saveContact()" class="bg-blue-600 text-white px-8 py-2 rounded-2xl font-bold shadow-lg">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+	
+	<div id="dashboardPage" class="hidden p-6 bg-gray-100 min-h-screen">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-black text-gray-800">Tableau de Bord BI</h1>
+            <p class="text-gray-500">Vue d'ensemble de votre portefeuille et activité</p>
+        </div>
+        <button onclick="switchView('main')" class="bg-gray-800 text-white px-6 py-2 rounded-xl shadow-lg hover:bg-black transition">
+            ← Retour au CRM
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-blue-500">
+            <p class="text-gray-400 text-xs font-bold uppercase">Total Assurance Vie</p>
+            <p id="stat-av" class="text-2xl font-black text-gray-800">0 €</p>
+        </div>
+        <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-emerald-500">
+            <p class="text-gray-400 text-xs font-bold uppercase">Total PER</p>
+            <p id="stat-per" class="text-2xl font-black text-gray-800">0 €</p>
+        </div>
+        <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-orange-500">
+            <p class="text-gray-400 text-xs font-bold uppercase">Total SCPI</p>
+            <p id="stat-scpi" class="text-2xl font-black text-gray-800">0 €</p>
+        </div>
+        <div class="bg-white p-5 rounded-3xl shadow-sm border-l-8 border-purple-500">
+            <p class="text-gray-400 text-xs font-bold uppercase">Total IMMO</p>
+            <p id="stat-immo" class="text-2xl font-black text-gray-800">0 €</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-3xl shadow-sm flex items-center gap-4">
+            <div class="bg-blue-100 p-4 rounded-2xl text-2xl">👥</div>
+            <div>
+                <p class="text-gray-400 text-xs font-bold uppercase">Âge Moyen</p>
+                <p id="stat-age" class="text-2xl font-black text-gray-800">0 ans</p>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-3xl shadow-sm flex items-center gap-4">
+            <div class="bg-pink-100 p-4 rounded-2xl text-2xl">👶</div>
+            <div>
+                <p class="text-gray-400 text-xs font-bold uppercase">Total Enfants</p>
+                <p id="stat-enfants" class="text-2xl font-black text-gray-800">0</p>
+            </div>
+        </div>
+        <div class="bg-white p-6 rounded-3xl shadow-sm flex items-center gap-4">
+            <div class="bg-yellow-100 p-4 rounded-2xl text-2xl">🏆</div>
+            <div>
+                <p class="text-gray-400 text-xs font-bold uppercase">Taux Conversion</p>
+                <p id="stat-conv" class="text-2xl font-black text-gray-800">0 %</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="bg-white p-6 rounded-3xl shadow-sm h-80">
+            <h3 class="font-bold mb-4 text-gray-700">Répartition du Portefeuille (€)</h3>
+            <canvas id="chartProduits"></canvas>
+        </div>
+        <div class="bg-white p-6 rounded-3xl shadow-sm h-80">
+            <h3 class="font-bold mb-4 text-gray-700">Pipeline Commercial</h3>
+            <canvas id="chartPipeline"></canvas>
+        </div>
+    </div>
+</div>
+    <script>
+        // CONFIGURATION GOOGLE SHEETS
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwV6jSC_OzfdRDFkDIwKQj2pUF6uON_tLkBukTuHUspvh9mjJXDLQ1t72d762ji1b0wsA/exec"; 
+
+let contacts = [];
+let filterRetardsOnly = false;
+let prodStats = {
+    av: { va: 0, vp: 0 },
+    per: { va: 0, vp: 0 },
+    scpi: { va: 0, vp: 0 },
+    immo: { va: 0, vp: 0 }
+};
+let rdvStats = { r0: 0, r1: 0, r2: 0, r3: 0 };
+let myChartVA = null; // Pour éviter les doublons lors de la réouverture
+let myChartVAPour = null; // Pour éviter les doublons lors de la réouverture
+let countR0 = 0, countR1 = 0, countR2 = 0, countR3 = 0, countDM = 0, countAD = 0, countTJ = 0;
+let totalVA_Global = 0;
+let totalVP_Global = 0;
+let totalPipe_Global = 0;
+let totalPipeVp_Global = 0;
+let totalEc_Global = 0;
+let totalEcVp_Global = 0;
+
+// --- AUTHENTICATION ---    
+<!-- function validerMotDePasse() { -->
+    <!-- if(document.getElementById('saisiePassword').value === "Spads2679@2026") { -->
+        <!-- document.getElementById('verrouillage').style.display = 'none'; -->
+        <!-- document.getElementById('mainContent').classList.remove('hidden'); -->
+        <!-- loadFromSheets(); -->
+    <!-- } else { -->
+        <!-- alert("Mot de passe incorrect"); -->
+    <!-- } -->
+<!-- } -->
+
+<!-- document.addEventListener('keypress', (e) => { if (e.key === 'Enter') validerMotDePasse(); });  -->
+
+
+function getFilteredContactsForRDV() {
+    const seenFoyers = new Set();
+    return contacts.filter(c => {
+        // La clé de regroupement : si la fiche a un foyer_id, on l'utilise.
+        // Sinon, on utilise son propre ID (au cas où elle soit le chef).
+        // Mais attention : on ne groupe QUE si la fiche est liée à quelqu'un.
+        
+        const isLinked = c.foyer_id || contacts.some(m => m.foyer_id === c.id);
+        
+        if (!isLinked) return true; // Personne seule, on compte.
+
+        const groupId = c.foyer_id || c.id; // L'ID du foyer est soit le foyer_id, soit l'ID du chef.
+
+        if (seenFoyers.has(groupId)) {
+            return false; // Déjà compté pour ce foyer
+        }
+        
+        seenFoyers.add(groupId);
+        return true;
+    });
+}
+
+async function validerMotDePasse() {
+    const input = document.getElementById('saisiePassword');
+    if (!input) {
+        console.error("Élément 'saisiePassword' introuvable.");
+        return;
+    }
+
+    const mdpSaisi = input.value;
+    
+    // Le Hash SHA-256 correspondant à "Sp......6"
+    const hashCible = "c1b81496087d238c4d98b4508b7d53a7082829bc35e067f5dc0c7a8f206119a0";
+
+    try {
+        // Génération du hash du mot de passe saisi
+        const msgUint8 = new TextEncoder().encode(mdpSaisi);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        if (hashHex === hashCible) {
+            // Succès : On cache l'écran de verrouillage
+            document.getElementById('verrouillage').style.display = 'none';
+            
+            // On affiche le contenu principal s'il était caché
+            const main = document.getElementById('mainContent');
+            if (main) main.classList.remove('hidden');
+            
+            // Chargement des données
+            if (typeof loadFromSheets === 'function') {
+                loadFromSheets();
+            } else if (typeof loadFromCloud === 'function') {
+                loadFromCloud();
+            }
+        } else {
+            alert("Mot de passe incorrect");
+            input.value = ""; // On vide le champ en cas d'erreur
+        }
+    } catch (e) {
+        console.error("Erreur de sécurité : ", e);
+        // Fallback simple si le navigateur bloque l'API Crypto (ex: hors HTTPS)
+        if (mdpSaisi === "Spads2679@2026") {
+             document.getElementById('verrouillage').style.display = 'none';
+             if (document.getElementById('mainContent')) document.getElementById('mainContent').classList.remove('hidden');
+             loadFromSheets();
+        }
+    }
+}
+
+// Gestion de la touche Entrée
+document.addEventListener('keypress', (e) => { 
+    if (e.key === 'Enter') {
+        // On vérifie si l'utilisateur est bien sur le champ de mot de passe
+        if (document.activeElement.id === 'saisiePassword' || document.getElementById('verrouillage').style.display !== 'none') {
+            validerMotDePasse(); 
+        }
+    }
+});
+
+function exportFilteredData() {
+    // 1. Récupérer les données actuellement affichées (en tenant compte des filtres actifs)
+    // Nous réutilisons la logique de filtrage existante pour être précis
+    const searchTerm = document.getElementById('searchBar').value.toLowerCase();
+    const filterStatut = document.getElementById('filterStatut').value;
+    const filterTemp = document.getElementById('filterTemp').value;
+    const filterDemarchage = document.getElementById('filterDemarchage').value;
+    const filterAgeMin = parseInt(document.getElementById('filterAgeMin').value) || 0;
+    const filterAgeMax = parseInt(document.getElementById('filterAgeMax').value) || 999;
+    const filterCampagne = document.getElementById('filterCampagne').value;
+
+    const filtered = contacts.filter(c => {
+        const matchesSearch = (c.nom + " " + c.prenom).toLowerCase().includes(searchTerm);
+        const matchesStatut = filterStatut === "Tous" || c.statut_global === filterStatut;
+        const matchesTemp = filterTemp === "Tous" || c.cercle === filterTemp;
+        const matchesDemarchage = filterDemarchage === "Tous" || c.demarchage === filterDemarchage;
+        const age = c.age || 0;
+        const matchesAge = age >= filterAgeMin && age <= filterAgeMax;
+        
+        // On vérifie aussi les filtres spécifiques (Appels, Relance, etc.)
+        const matchesAppel = !document.getElementById('filterAppel').checked || c.appel === true;
+		const matchesUdp = !document.getElementById('filterUdp').checked || c.udp === true;
+        const matchesNoire = !document.getElementById('filterNoir').checked || c.noire === true;
+        const matchesRelance = !document.getElementById('filterHasRelance').checked || (c.relance && new Date(c.relance) < new Date());
+        const matchesCampagne = filterCampagne === "Tous" || (c.campagnes && c.campagnes.includes(filterCampagne));
+
+        return matchesSearch && matchesStatut && matchesTemp && matchesDemarchage && 
+               matchesAge && matchesAppel && matchesNoire && matchesRelance && matchesCampagne;
+    });
+
+    if (filtered.length === 0) {
+        alert("Aucune donnée à exporter.");
+        return;
+    }
+
+    // 2. Préparer l'en-tête CSV
+    let csvContent = "\uFEFF"; // BOM pour le support des accents dans Excel
+    csvContent += "Nom;Prénom;Téléphone;Email;Statut;Montant AV;Montant PER;Montant SCPI;Montant IMMO;Historique\n";
+
+    // 3. Parcourir les données filtrées
+    filtered.forEach(c => {
+        const row = [
+            c.nom || "",
+            c.prenom || "",
+            c.tel || "",
+            c.email || "",
+            c.statut_global || "",
+            c.sol_av_m || 0,
+            c.sol_per_m || 0,
+            c.sol_scpi_m || 0,
+            c.sol_immo_m || 0,
+            (c.histo || "").replace(/(\r\n|\n|\r|;)/gm, " ") // Nettoyage de l'historique pour le CSV
+        ];
+        csvContent += row.join(";") + "\n";
+    });
+
+    // 4. Création et téléchargement du fichier
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Export_CRM_${new Date().toLocaleDateString()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+
+// --- CALCULS AUTOMATIQUES ---
+function calculerAge() {
+    const birthDate = new Date(document.getElementById('f_anniv').value);
+    if (isNaN(birthDate)) return;
+    const diff = Date.now() - birthDate.getTime();
+    const ageDate = new Date(diff);
+    document.getElementById('f_age').value = Math.abs(ageDate.getUTCFullYear() - 1970);
+}
+
+// FONCTION CORRIGÉE POUR LE DASHBOARD
+function showRdvContacts(etape, type) {
+    // 1. Retour à la vue principale
+    switchView('main');
+    
+    // 2. Réinitialisation visuelle des filtres (pour ne pas perturber l'utilisateur)
+    document.getElementById('searchBar').value = '';
+    document.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+    document.getElementById('filterStatut').value = 'Tous';
+    
+    // 3. Filtrage précis basé sur vos données (R1, R2, DM, etc.)
+    const maintenant = new Date();
+    
+    const resultats = contacts.filter(c => {
+        // On récupère la date de l'étape (ex: c.R1 ou c.DM)
+        const valeurDate = c[etape]; 
+        if (!valeurDate) return false;
+        
+        const dateRDV = new Date(valeurDate);
+        // Vérification si la date est valide
+        if (isNaN(dateRDV.getTime())) return false;
+
+        if (type === 'fait') {
+            return dateRDV <= maintenant;
+        } else {
+            return dateRDV > maintenant;
+        }
+    });
+
+    // 4. Affichage des fiches impactées
+    renderFilteredTable(resultats, `Filtre : ${etape} ${type}`);
+}
+
+// REMPLACEZ AUSSI la fonction de rendu pour garantir l'affichage
+function renderFilteredTable(dataToDisplay, label) {
+    const tbody = document.getElementById('tableBody');
+    const counter = document.getElementById('counter');
+    
+    // On vide le tableau
+    tbody.innerHTML = '';
+    
+    if (dataToDisplay.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="p-10 text-center text-gray-400 italic">Aucune fiche trouvée pour ce critère.</td></tr>`;
+        counter.innerText = "0";
+        return;
+    }
+
+    // Utilisation d'un fragment pour la performance (Architecte mode)
+    const fragment = document.createDocumentFragment();
+    
+    dataToDisplay.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-blue-50 transition cursor-pointer border-b border-gray-100";
+        tr.onclick = () => editContact(c.id);
+        
+        // On remplit la ligne avec vos données exactes
+        tr.innerHTML = `
+            <td class="p-4 font-bold text-gray-800">${c.prenom || ''} ${ (c.nom || '').toUpperCase()}</td>
+            <td class="p-4"><span class="px-2 py-1 rounded-full text-[10px] font-black ${c.statut === 'Client' ? 'status-client' : 'status-prospect'}">${c.statut || 'Prospect'}</span><br><span class="text-[10px] text-gray-400">${c.etape || '-'}</span></td>
+            <td class="p-4 text-xs"><b>${c.cercle || '-'}</b><br>${c.demarchage || '-'}</td>
+            <td class="p-4 text-xs">${c.tel || '-'}<br><span class="text-gray-400">${c.email || '-'}</span></td>
+            <td class="p-4 font-black text-blue-600">${(c.totalVA || 0).toLocaleString()} €</td>
+            <td class="p-4 text-center text-[10px] text-gray-500">${c.metier || '-'}</td>
+            <td class="p-4 text-center font-bold text-blue-500">${c.daterdv ? new Date(c.daterdv).toLocaleDateString() : '-'}</td>
+            <td class="p-4 text-center">${c.relance ? '📅' : ''}</td>
+        `;
+        fragment.appendChild(tr);
+    });
+    
+    tbody.appendChild(fragment);
+    counter.innerText = dataToDisplay.length;
+}
+
+function updateBirthdayWidget() {
+    const container = document.getElementById('birthdaySection');
+    const list = document.getElementById('birthdayList');
+    if (!container || !list || !contacts) return;
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // 1. Définition de l'intervalle : Lundi de cette semaine au Dimanche
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(now.getTime());
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday.getTime());
+    sunday.setDate(monday.getDate() + 14);
+    sunday.setHours(23, 59, 59, 999);
+
+    list.innerHTML = '';
+
+    // 2. Filtrer les contacts qui ont leur anniversaire cette semaine et pas encore passé
+    let upcomingBirthdays = contacts.filter(c => {
+        if (!c.anniv) return false;
+        const bDate = new Date(c.anniv);
+        // On crée la date d'anniversaire pour l'année en cours
+        const thisYearBday = new Date(now.getFullYear(), bDate.getMonth(), bDate.getDate());
+        return (thisYearBday >= monday && thisYearBday <= sunday && thisYearBday >= now);
+    });
+
+    // 3. TRIER les résultats par date (du plus proche au plus éloigné)
+    upcomingBirthdays.sort((a, b) => {
+        const dateA = new Date(a.anniv);
+        const dateB = new Date(b.anniv);
+        const bdayA = new Date(now.getFullYear(), dateA.getMonth(), dateA.getDate());
+        const bdayB = new Date(now.getFullYear(), dateB.getMonth(), dateB.getDate());
+        return bdayA - bdayB;
+    });
+
+    // 4. Générer l'affichage pour chaque contact trié
+    upcomingBirthdays.forEach((c) => {
+        const bDate = new Date(c.anniv);
+        const thisYearBday = new Date(now.getFullYear(), bDate.getMonth(), bDate.getDate());
+        const contactId = c.id; 
+        const isToday = thisYearBday.getTime() === now.getTime();
+
+        const card = document.createElement('div');
+        card.className = "bg-white px-4 py-2 rounded-xl shadow-sm border border-blue-200 flex items-center gap-3 cursor-pointer hover:bg-blue-50 hover:scale-105 transition-all";
+        
+        // Au clic : retrouve l'index réel via l'ID pour ouvrir la bonne fiche
+        card.onclick = function() {
+            const realIndex = contacts.findIndex(item => item.id === contactId);
+            if (realIndex !== -1) {
+                openModal(realIndex);
+            }
+        };
+
+        card.innerHTML = `
+            <div style="pointer-events: none;">
+                <p class="text-[10px] font-bold ${isToday ? 'text-red-500 animate-pulse' : 'text-blue-400'} uppercase">
+                    ${isToday ? "Aujourd'hui !" : thisYearBday.toLocaleDateString('fr-FR', {day:'numeric', month:'long'})}
+                </p>
+                <p class="text-sm font-black text-gray-800">${c.prenom} ${c.nom.toUpperCase()}</p>
+            </div>`;
+        list.appendChild(card);
+    });
+
+    // Affiche le bloc bleu seulement s'il y a des anniversaires
+    container.classList.toggle('hidden', upcomingBirthdays.length === 0);
+}
+
+
+
+function calcTotals() {
+    const ids = ['av', 'per', 'scpi', 'immo'];
+    let totalVA = 0;
+    let totalVP = 0;
+    
+    ids.forEach(id => {
+        totalVA += parseFloat(document.getElementById(`sol_${id}_m`).value) || 0;
+        totalVP += parseFloat(document.getElementById(`sol_${id}_v`).value) || 0;
+    });
+
+    document.getElementById('f_totalva_label').innerText = totalVA.toLocaleString() + " €";
+    document.getElementById('f_totalvp_label').innerText = totalVP.toLocaleString() + " €";
+    return { totalVA, totalVP };
+}
+
+function generateBI() {
+    // On s'assure que les calculs sont à jour avant d'ouvrir
+    renderTable(); 
+	
+	
+    document.getElementById('statsModal').classList.remove('hidden');
+    
+
+	// Injection des chiffres dans les conteneurs de la modale
+    document.getElementById('statsContainer').innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6 text-center">
+            <div class="bg-white p-4 rounded-2xl border-t-4 shadow-sm">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">VA</h3>
+                <p class="text-xl font-black">VT : ${document.getElementById('statVA').innerText}</p>
+				<p class="text-xl font-black">VP : ${document.getElementById('statVP').innerText}</p>
+            </div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Signé (EC)</h3>
+                <p class="text-xl font-black">VT : ${document.getElementById('statPipe').innerText}</p>
+				<p class="text-xl font-black">VP : ${document.getElementById('statPipeVp').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">VA + EC</h3>
+                <p class="text-xl font-black">VT : ${document.getElementById('statEc').innerText}</p>
+				<p class="text-xl font-black">VP : ${document.getElementById('statEcVp').innerText}</p>
+			</div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Commissions Estimées</h3>
+                <p class="text-xl font-black">${document.getElementById('statCAN').innerText}</p>
+				<p class="text-xl font-black">${document.getElementById('statCAB').innerText}</p>
+            </div>
+			
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Potentiel</h3>
+                <p class="text-xl font-black">VT : ${document.getElementById('statPot').innerText}</p>
+				<p class="text-xl font-black">VP : ${document.getElementById('statPotVp').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">VA Total Possible</h3>
+                <p class="text-xl font-black">VT : ${document.getElementById('statVATot').innerText}</p>
+				<p class="text-xl font-black">VP : ${document.getElementById('statVPTot').innerText}</p>
+            </div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+                <h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Nombre Clients</h3>
+                <p class="text-xl font-black">${document.getElementById('statClients').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+				<h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Transfo R1 → Client</h3>
+				<p class="text-xl font-black">${document.getElementById('txR1Clt').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+				<h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Transfo R2 → Client</h3>
+				<p class="text-xl font-black">${document.getElementById('txR2Clt').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+				<h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Taux Client AV</h3>
+				<p class="text-xl font-black">${document.getElementById('txR2AV').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+				<h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">Taux Client PER</h3>
+				<p class="text-xl font-black">${document.getElementById('txR2PER').innerText}</p>
+			</div>
+			<div class="bg-white p-4 rounded-2xl shadow-sm border-t-4">
+				<h3 class="text-blue-600 font-black uppercase text-xs mb-4 self-start text-left">VA Moyenne par client</h3>
+				<p class="text-xl font-black">${document.getElementById('vaMoyClt').innerText}</p>
+			</div>
+        </div>`;
+		
+		
+	
+	
+	<!-- <!-- const etapes = [ -->
+        <!-- { label: 'R1', val: countR1 }, -->
+        <!-- { label: 'R2', val: countR2 }, -->
+        <!-- { label: 'R3', val: countR3 }, -->
+        <!-- { label: 'DM', val: countDM }, -->
+        <!-- { label: 'AD', val: countAD }, -->
+        <!-- { label: '3J', val: countTJ } -->
+    <!-- ]; -->
+
+    <!-- document.getElementById('rdvList').innerHTML = etapes.map(e => ` -->
+        <!-- <div class="flex justify-between items-center border-b border-gray-50 pb-2 shadow-sm"> -->
+            <!-- <span class="text-sm font-bold text-gray-600">${e.label}</span> -->
+            <!-- <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg font-black">${e.val}</span> -->
+        <!-- </div> -->
+		
+    <!-- `).join(''); --> -->       prodStats.av.va, prodStats.per.va, prodStats.scpi.va, prodStats.immo.va
+	
+    // Optionnel : Initialiser un graphique ici plus tard avec Chart.js
+	const ctx = document.getElementById('chartVA').getContext('2d');
+	const ctx2 = document.getElementById('chartVAPour').getContext('2d');
+	//const chartApporteurs = document.getElementById('chartVAPour').getContext('2d');
+    
+    // On détruit l'ancien graphique s'il existe pour pouvoir le recréer proprement
+    if (myChartVA) { myChartVA.destroy(); }
+	if (myChartVAPour) { myChartVAPour.destroy(); }
+
+    
+    
+	myChartVA = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['AV', 'PER', 'SCPI', 'IMMO'],
+            datasets: [{
+                data: [prodStats.av.va, prodStats.per.va, prodStats.scpi.va, prodStats.immo.va],
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+    });
+	
+	let totalSol = prodStats.av.va + prodStats.per.va + prodStats.scpi.va + prodStats.immo.va
+	let pour_av = Math.round((prodStats.av.va * 100) / totalSol)
+	let pour_per = Math.round((prodStats.per.va * 100) / totalSol)
+	let pour_scpi = Math.round((prodStats.scpi.va * 100) / totalSol)
+	let pour_immo = Math.round((prodStats.immo.va * 100) / totalSol)
+	
+	myChartVAPour = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['AV', 'PER', 'SCPI', 'IMMO'],
+            datasets: [{
+                data: [pour_av, pour_per, pour_scpi, pour_immo],
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+    });
+	
+	// 4. Calcul et Graphique Apporteurs
+const apporteurs = {};
+let totalRecommandations = 0;
+const tauxReco = Math.round((totalRecommandations / contacts.length) * 100);
+
+contacts.forEach(c => {
+    if(c.recommandation && c.recommandation.trim() !== "") {
+        const nom = c.recommandation.trim();
+        apporteurs[nom] = (apporteurs[nom] || 0) + 1;
+        totalRecommandations++;
+    }
+});
+
+const topApporteurs = Object.entries(apporteurs)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+// Destruction pour éviter les superpositions
+let chartStatus = Chart.getChart("chartApporteurs");
+if (chartStatus) chartStatus.destroy();
+
+new Chart(document.getElementById('chartApporteurs').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: topApporteurs.map(a => a[0]),
+        datasets: [{
+            data: topApporteurs.map(a => a[1]),
+            backgroundColor: ['#f43f5e', '#3b82f6', '#10b981', '#eab308', '#8b5cf6']
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 }}}       }
+    }
+});
+	document.getElementById('apporteurs').innerText = "Top 5 Apporteurs sur " + totalRecommandations.toLocaleString() + " recommandations";
+}
+
+// Fonction utilitaire pour éviter les doublons de graphiques
+function updateChart(id, type, labels, datasets) {
+    let chartStatus = Chart.getChart(id);
+    if (chartStatus) chartStatus.destroy();
+
+    new Chart(document.getElementById(id), {
+        type: type,
+        data: { labels: labels, datasets: datasets },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+}
+
+// Fonction pour basculer entre CRM et Dashboard
+function switchView(view) {
+    if(view === 'stats') {
+        document.getElementById('mainContent').classList.add('hidden');
+        document.getElementById('statsModal').classList.remove('hidden');
+        generateBI();
+    } else {
+        document.getElementById('mainContent').classList.remove('hidden');
+        document.getElementById('statsModal').classList.add('hidden');
+    }
+}
+
+function logCampagne(type) {
+    const field = document.getElementById('f_campagnes');
+    const maintenant = new Date();
+    const dateFormatee = maintenant.toLocaleDateString('fr-FR') + ' ' + maintenant.getHours() + 'h' + maintenant.getMinutes();
+    
+    const nouvelleEntree = `[${dateFormatee}] - Envoi ${type}`;
+    
+    if (field.value.trim() === "") {
+        field.value = nouvelleEntree;
+    } else {
+        field.value = nouvelleEntree + "\n" + field.value;
+    }
+}
+
+function toggleClientFields() {
+    const status = document.getElementById('f_statut_global').value;
+    const fields = document.getElementById('clientFields');
+    if(status === "Client" || status === "Filleul" || status === "Prospect Rencontré") {
+        fields.classList.remove('opacity-40', 'pointer-events-none');
+    } else {
+        fields.classList.add('opacity-40', 'pointer-events-none');
+    }
+}
+
+function updateParrainsList() {
+    const datalist = document.getElementById('listeParrains');
+    // On crée un tableau de noms uniques (NOM Prénom)
+    const noms = contacts.map(c => `${c.nom} ${c.prenom}`.trim());
+    const nomsUniques = [...new Set(noms)].sort();
+
+    // On remplit la datalist
+    datalist.innerHTML = nomsUniques
+        .map(nom => `<option value="${nom}">`)
+        .join('');
+}
+
+function formaterTelephone(input) {
+    // On récupère uniquement les chiffres
+    let tel = input.value.replace(/\D/g, '');
+    
+    // On limite à 10 chiffres
+    if (tel.length > 10) tel = tel.substr(0, 10);
+    
+    // On ajoute les espaces tous les deux chiffres
+    let telFormate = "";
+    for (let i = 0; i < tel.length; i++) {
+        if (i > 0 && i % 2 === 0) telFormate += " ";
+        telFormate += tel[i];
+    }
+    
+    input.value = telFormate;
+}
+
+function formatToFrenchDate(dateStr) {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "-";
+    
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    
+    return `${day}/${month}/${year} à ${hours}:${mins}`;
+}
+
+function formatDateForInput(dateStr) {
+    if (!dateStr || dateStr === "" || dateStr === "-") return "";
+    
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+
+    // On ajuste pour le fuseau horaire local afin d'éviter les décalages d'une heure
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+    
+    return localISOTime; // Retourne "YYYY-MM-DDTHH:mm"
+}
+
+function formatFR(dateStr) {
+    if (!dateStr || dateStr === "-" || dateStr === "") return "-";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString('fr-FR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    }).replace(':', 'h').replace(',', ' à');
+}
+
+// --- CHARGEMENT ---
+async function loadFromSheets() {
+    const indicator = document.getElementById('statusIndicator');
+    indicator.className = "w-3 h-3 rounded-full bg-yellow-400 animate-pulse";
+    
+    try {
+        const response = await fetch(SCRIPT_URL);
+        contacts = await response.json();
+        indicator.className = "w-3 h-3 rounded-full bg-green-500";
+        renderTable();
+		updateAvanceStats();
+		updateRdvStats();
+    } catch (error) {
+        console.error("Erreur:", error);
+        indicator.className = "w-3 h-3 rounded-full bg-red-500";
+        contacts = JSON.parse(localStorage.getItem('crm_data_backup')) || [];
+        renderTable();
+		updateAvanceStats();
+		updateRdvStats();
+    }
+}
+
+function openStatsModal() {
+    // On s'assure que les calculs sont à jour avant d'ouvrir
+    renderTable(); 
+    document.getElementById('statsModal').classList.remove('hidden');
+    
+	// Injection des chiffres dans les conteneurs de la modale
+    document.getElementById('statsContainer').innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 text-center">
+            <div class="bg-white p-4 rounded-2xl border-l-4 border-blue-500 shadow-sm">
+                <h3 class="text-gray-400 text-[12px] font-bold uppercase">VA Total</h3>
+                <p class="text-xl font-black">${document.getElementById('statVA').innerText}</p>
+				
+            </div>
+            <div class="bg-white p-4 rounded-2xl border-l-4 border-green-500 shadow-sm">
+                <h3 class="text-gray-400 text-[12px] font-bold uppercase">VP Total</h3>
+                <p class="text-xl font-black">${document.getElementById('statVP').innerText}</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border-l-4 border-orange-500 shadow-sm">
+                <h3 class="text-gray-400 text-[12px] font-bold uppercase">Commissions Estimées</h3>
+                <p class="text-xl font-black">${document.getElementById('statCAN').innerText}</p>
+				<p class="text-xl font-black">${document.getElementById('statCAB').innerText}</p>
+            </div>
+			
+        </div>
+		
+    `;
+	
+	const etapes = [
+        { label: 'R1', val: countR1 },
+        { label: 'R2', val: countR2 },
+        { label: 'R3', val: countR3 },
+        { label: 'DM', val: countDM },
+        { label: 'AD', val: countAD },
+        { label: '3J', val: countTJ }
+    ];
+
+    document.getElementById('rdvList').innerHTML = etapes.map(e => `
+        <div class="flex justify-between items-center border-b border-gray-50 pb-2">
+            <span class="text-sm font-bold text-gray-600">${e.label}</span>
+            <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg font-black">${e.val}</span>
+        </div>
+		
+    `).join('');
+	
+    // Optionnel : Initialiser un graphique ici plus tard avec Chart.js
+	const ctx = document.getElementById('chartVA').getContext('2d');
+    
+    // On détruit l'ancien graphique s'il existe pour pouvoir le recréer proprement
+    if (myChartVA) { myChartVA.destroy(); }
+
+    // On récupère les données calculées par renderTable()
+    // Note : Assure-toi que prodStats est déclaré en dehors de renderTable pour y accéder ici
+    //const dataVA = [
+    //  prodStats.av.va,
+    // prodStats.per.va,
+    //   prodStats.scpi.va,
+    //    prodStats.immo.va
+    //];
+
+    myChartVA = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['AV', 'PER', 'SCPI', 'IMMO'],
+            datasets: [{
+                data: [prodStats.av.va, prodStats.per.va, prodStats.scpi.va, prodStats.immo.va],
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+        }
+    });
+}
+
+function closeStatsModal() {
+    document.getElementById('statsModal').classList.add('hidden');
+}
+
+// --- ENREGISTREMENT ---
+async function saveContact() {
+    const btn = document.getElementById('btnSave');
+    btn.innerText = "Enregistrement...";
+    btn.disabled = true;
+
+    const contactData = {
+        id: document.getElementById('f_id').value || "ID_" + Date.now(),
+        nom: document.getElementById('f_nom').value.toUpperCase(),
+        prenom: document.getElementById('f_prenom').value,
+        genre: document.getElementById('f_genre').value,
+        anniv: document.getElementById('f_anniv').value,
+        age: document.getElementById('f_age').value || 0,
+        situfam: document.getElementById('f_situfam').value,
+        enfants: document.getElementById('f_enfants').value,
+		foyer_id: document.getElementById('f_foyer_id').value || "",
+        proprio: document.getElementById('f_proprio').checked,
+		appel: document.getElementById('f_appel').checked,
+		udp: document.getElementById('f_udp').checked,
+		noire: document.getElementById('f_noire').checked,
+        metier: document.getElementById('f_metier').value,
+        relance: document.getElementById('f_relance').value,
+        tel: "'" + document.getElementById('f_tel').value.replace(/\s/g, ''),
+        email: document.getElementById('f_email').value,
+        adresse: document.getElementById('f_adresse').value,
+        cercle: document.getElementById('f_cercle').value,
+        demarchage: document.getElementById('f_demarchage').value,
+        statut: document.getElementById('f_statut_global').value,
+        etape: document.getElementById('f_etape').value,
+        daterdv: document.getElementById('f_daterdv').value,
+        sol_av_m: document.getElementById('sol_av_m').value || 0,
+        sol_av_v: document.getElementById('sol_av_v').value || 0,
+        sol_per_m: document.getElementById('sol_per_m').value || 0,
+        sol_per_v: document.getElementById('sol_per_v').value || 0,
+        sol_scpi_m: document.getElementById('sol_scpi_m').value || 0,
+        sol_scpi_v: document.getElementById('sol_scpi_v').value || 0,
+        sol_immo_m: document.getElementById('sol_immo_m').value || 0,
+        sol_immo_v: document.getElementById('sol_immo_v').value || 0,
+        notes: document.getElementById('f_notes').value,
+        histo: document.getElementById('f_histo').value,
+		R0: document.getElementById('f_r0').value,
+		R1: document.getElementById('f_r1').value,
+		R2: document.getElementById('f_r2').value,
+		R3: document.getElementById('f_r3').value,
+		RX: document.getElementById('f_rx').value,
+		DM: document.getElementById('f_dm').value,
+		AD: document.getElementById('f_ad').value,
+		TJ: document.getElementById('f_tj').value,
+		recommandation: document.getElementById('f_recommandation').value,
+		campagnes: document.getElementById('f_campagnes').value,
+		pipe: document.getElementById('f_pipe').value,
+		pipe_vp: document.getElementById('f_pipe_vp').value,
+		pot: document.getElementById('f_pot').value,
+		pot_vp: document.getElementById('f_pot_vp').value,
+		//appel:document.getElementById('f_appel').checked,
+    };
+
+    try {
+        fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(contactData)
+        }).then(() => {
+        console.log("Synchronisé avec succès");
+    }).catch(err => {
+        alert("Erreur de synchro, vérifiez votre connexion");
+    });
+
+        setTimeout(() => {
+            closeModal();
+            loadFromSheets();
+            btn.innerText = "Enregistrer";
+            btn.disabled = false;
+        }, 1000);
+        
+        localStorage.setItem('crm_data_backup', JSON.stringify(contacts));
+    } catch (error) {
+        alert("Erreur de connexion Cloud");
+        btn.disabled = false;
+    }
+}
+
+async function deleteContact() {
+    const id = document.getElementById('f_id').value;
+    if (!id || !confirm("Supprimer définitivement ?")) return;
+
+    const btn = document.getElementById('btnDelete');
+    btn.innerText = "Suppression...";
+
+    await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Gardé car Google Script ne renvoie pas de headers CORS standard
+        body: JSON.stringify({ id: id, action: "DELETE" })
+    });
+
+    // On attend 1.5s pour que le script Google finisse le travail
+    setTimeout(() => {
+        closeModal();
+        loadFromSheets(); // Recharge la liste
+        btn.innerText = "Supprimer";
+    }, 1500);
+}
+
+function toggleFilterRelance() {
+    filterRetardsOnly = !filterRetardsOnly;
+    document.getElementById('filterRelanceStatus').classList.toggle('hidden', !filterRetardsOnly);
+    renderTable();
+}
+
+function openModalById(id) {
+    // On cherche la position du contact dans la liste globale grâce à son ID
+    const realIndex = contacts.findIndex(c => String(c.id) === String(id));
+    if (realIndex !== -1) {
+        openModal(realIndex);
+    } else {
+        console.error("Impossible de trouver le contact avec l'ID:", id);
+    }
+}
+
+// 1. Recherche et Liaison
+function rechercheFoyer(val) {
+    const resultsDiv = document.getElementById('foyer_results');
+    if (val.length < 2) { resultsDiv.classList.add('hidden'); return; }
+    
+    const matches = contacts.filter(c => 
+        (c.nom.toLowerCase().includes(val.toLowerCase()) || c.prenom.toLowerCase().includes(val.toLowerCase()))
+        && c.id !== document.getElementById('f_id').value
+    );
+
+    resultsDiv.innerHTML = matches.map(m => `
+        <div onclick="lierAuFoyer('${m.id}', '${m.nom} ${m.prenom}')" class="p-2 hover:bg-indigo-50 cursor-pointer text-xs border-b">
+            ${m.nom} ${m.prenom}
+        </div>
+    `).join('');
+    resultsDiv.classList.remove('hidden');
+}
+
+function lierAuFoyer(targetId, targetName) {
+    const currentId = document.getElementById('f_id').value;
+    const targetContact = contacts.find(c => c.id === targetId);
+    
+    // Si la cible a déjà un foyer_id, on prend le sien, sinon on prend l'ID de la cible (elle devient chef)
+    //const finalFoyerId = targetContact.foyer_id || targetId;
+    
+    document.getElementById('f_foyer_id').value = targetId;
+    document.getElementById('f_foyer_nom').value = targetName;
+    document.getElementById('foyer_results').classList.add('hidden');
+    document.getElementById('foyer_status').innerText = "Rattaché au foyer de " + targetName;
+    document.getElementById('btn_delier').classList.remove('hidden');
+}
+
+function delierFoyer() {
+    if(confirm("Voulez-vous détacher cette personne du foyer ?")) {
+        document.getElementById('f_foyer_id').value = "";
+        document.getElementById('f_foyer_nom').value = "";
+        document.getElementById('foyer_status').innerText = "Lien supprimé (pensez à enregistrer)";
+        document.getElementById('btn_delier').classList.add('hidden');
+    }
+}
+
+// --- AFFICHAGE TABLEAU & STATS ---
+function renderTable() {
+	updateBirthdayWidget();
+    const tableBody = document.getElementById('tableBody');
+    const query = document.getElementById('searchBar').value.toLowerCase();
+    const filterStatut = document.getElementById('filterStatut').value;
+    const filterCercle = document.getElementById('filterTemp').value;
+    const filterDem = document.getElementById('filterDemarchage').value;
+    const filterProprio = document.getElementById('filterProprio').checked;
+	const filterAppel = document.getElementById('filterAppel').checked;
+	const filterUdp = document.getElementById('filterUdp').checked;
+	const filterNoir = document.getElementById('filterNoir').checked;
+	const filterHasRelance = document.getElementById('filterHasRelance').checked;
+    const ageMin = parseInt(document.getElementById('filterAgeMin').value) || 0;
+    const ageMax = parseInt(document.getElementById('filterAgeMax').value) || 999;
+    const filterCampagne = document.getElementById('filterCampagne');
+    const selectedValue = filterCampagne.value; // On garde la valeur actuelle
+    const typesCampagnes = new Set();
+    const today = new Date().toISOString().split('T')[0];
+	
+    
+    let html = '';
+    let totalVA_Global = 0;
+    let totalVP_Global = 0;
+	let totalPipe_Global = 0;
+	let totalPipeVp_Global = 0;
+	let totalEc_Global = 0;
+	let totalEcVp_Global = 0;
+	let totalPot_Global = 0;
+	let totalPotVp_Global = 0;
+	let totalVP_Mens = 0;
+	let totalVA_Total = 0;
+	let totalVP_Total = 0;
+    let countProspects = 0;
+    let countClients = 0;
+    let countRetards = 0;
+    let displayedCount = 0;
+	let countMiseEnRelation = 0;
+	let clientsAV = 0, clientsPER = 0, clientsSCPI = 0, clientsIMMO = 0;
+	let totalClients = contacts.filter(c => c.statut_global === "Client").length || 1;
+	let tauxR1;
+	let tauxR2;
+	let tauxR2AV;
+	let tauxR2PER;
+	let tauxR2IMMO;
+	let tauxR2SCPI;
+	let VaMoy_Client ;
+	
+	// Nouveaux compteurs pour le tableau de bord
+    //countR0 = 0; countR1 = 0; countR2 = 0; countR3 = 0; countAD = 0; countTJ = 0; countDM = 0; countAD = 0; countTJ = 0;
+    prodStats = {
+        av: { va: 0, vp: 0 },
+        per: { va: 0, vp: 0 },
+        scpi: { va: 0, vp: 0 },
+        immo: { va: 0, vp: 0 }
+    };
+
+    contacts.forEach(c => {
+        // Calcul des totaux individuels pour les stats globales
+		const id = c.id || "ID_" + Math.random();
+        const nom = (c.nom || "").toString().toUpperCase();
+        const prenom = (c.prenom || "").toString();
+        const statut = c.statut || "Prospect";
+        const relance = c.relance || "";
+		const age = parseInt(c.age) || 0;
+        const vaIndiv = (parseFloat(c.sol_av_m)||0) + (parseFloat(c.sol_per_m)||0) + (parseFloat(c.sol_scpi_m)||0) + (parseFloat(c.sol_immo_m)||0);
+        const vpIndiv = (parseFloat(c.sol_av_v)||0) + (parseFloat(c.sol_per_v)||0) + (parseFloat(c.sol_scpi_v)||0) + (parseFloat(c.sol_immo_v)||0);
+        const valPipe = parseFloat(c.pipe) || 0;
+		const valPipeVp = parseFloat(c.pipe_vp) || 0;
+		const valPot = parseFloat(c.pot) || 0;
+		const valPotVp = parseFloat(c.pot_vp) || 0;
+		
+        const isLate = c.relance && c.relance < today;
+        if(isLate) countRetards++;
+        if(c.statut === 'Client') countClients++; else countProspects++;
+		if (c.recommandation && c.recommandation.trim() !== "") countMiseEnRelation++;
+		// 1. Calcul de l'entonnoir (utilisez la casse exacte des colonnes Sheets)
+        //if (c.R0) countR0++;
+		//if (c.R1) countR1++;
+        //if (c.R2) countR2++;
+		//if (c.R3) countR3++;
+		//if (c.DM) countDM++;
+        //if (c.AD) countAD++;
+        //if (c.TJ) countTJ++;
+		if (c.sol_av_m) clientsAV++;
+		if (c.sol_per_m) clientsPER++; 
+        if (c.sol_scpi_m) clientsSCPI++; 
+        if (c.sol_immo_m) clientsIMMO++; 
+        //if (c.etape === "Terminé") countTermine++;
+		
+		if (document.getElementById('filterR0').checked && !c.R0) return false;
+		if (document.getElementById('filterR1').checked && !c.R1) return false;
+		if (document.getElementById('filterR2').checked && !c.R2) return false;
+		if (document.getElementById('filterR3').checked && !c.R3) return false;
+		if (document.getElementById('filterDM').checked && !c.DM) return false;
+		if (document.getElementById('filterAD').checked && !c.AD) return false;
+		if (document.getElementById('filterTJ').checked && !c.TJ) return false;
+		
+		if(c.campagnes) {
+            const lignes = c.campagnes.split('\n');
+            lignes.forEach(ligne => {
+                // On extrait le mot après "Envoi " (ex: "Mail")
+                if(ligne.includes("Envoi ")) {
+                    typesCampagnes.add(ligne.split("Envoi ")[1]);
+                }
+            });
+        }
+		filterCampagne.innerHTML = '<option value="Tous">Toute Campagne</option>';
+    typesCampagnes.forEach(type => {
+        filterCampagne.innerHTML += `<option value="${type}" ${selectedValue === type ? 'selected' : ''}>${type}</option>`;
+    });
+        // 2. Accumulation par produit (conversion en nombre sécurisée)
+        prodStats.av.va += parseFloat(c.sol_av_m) || 0;
+        prodStats.av.vp += parseFloat(c.sol_av_v) || 0;
+        
+        prodStats.per.va += parseFloat(c.sol_per_m) || 0;
+        prodStats.per.vp += parseFloat(c.sol_per_v) || 0;
+        
+        prodStats.scpi.va += parseFloat(c.sol_scpi_m) || 0;
+        prodStats.scpi.vp += parseFloat(c.sol_scpi_v) || 0;
+        
+        prodStats.immo.va += parseFloat(c.sol_immo_m) || 0;
+        prodStats.immo.vp += parseFloat(c.sol_immo_v) || 0;
+		
+		//Total VA
+		<!-- if (c.statut_global === "Client") { -->
+        <!-- if (parseFloat(c.sol_av_m) > 0) clientsAV++; -->
+        <!-- if (parseFloat(c.sol_per_m) > 0) clientsPER++; -->
+        <!-- if (parseFloat(c.sol_scpi_m) > 0) clientsSCPI++; -->
+        <!-- if (parseFloat(c.sol_immo_m) > 0) clientsIMMO++; -->
+    <!-- } -->
+
+        // Filtres
+        const matchSearch = (c.nom + " " + c.prenom).toLowerCase().includes(query);
+        const matchStatut = (filterStatut === "Tous") || (c.statut === filterStatut);
+        const matchCercle = (filterCercle === "Tous") || (c.cercle === filterCercle);
+        const matchDem = (filterDem === "Tous") || (c.demarchage === filterDem);
+        const matchProprio = !filterProprio || (c.proprio === true || c.proprio === "true");
+		const matchAppel = !filterAppel || (c.appel === true || c.appel === "true");
+		const matchUdp = !filterUdp || (c.udp === true || c.udp === "true");
+		const matchNoire = !filterNoir || (c.noire === true || c.noire === "true");
+        const matchAge = (parseInt(c.age) >= ageMin && parseInt(c.age) <= ageMax);
+        const matchRetard = !filterRetardsOnly || (filterRetardsOnly && isLate);
+		const matchHasRelance = !filterHasRelance || (c.relance && c.relance !== "");
+		const matchCampagne = (selectedValue === "Tous") || 
+                          (c.campagnes && c.campagnes.includes(selectedValue));
+
+
+        if (matchSearch && matchStatut && matchCercle && matchDem && matchProprio && matchAge && matchRetard && matchHasRelance && matchCampagne && matchAppel && matchNoire && matchUdp) {
+            displayedCount++;
+            totalVA_Global += vaIndiv;
+            totalVP_Global += vpIndiv*12;
+			totalPipe_Global += valPipe;
+			totalPipeVp_Global += valPipeVp*12;
+			totalPot_Global += valPot;
+			totalPotVp_Global += valPotVp*12;
+			totalVP_Mens += vpIndiv;
+			totalCAB = (totalVA_Global*0.05*0.4);
+			totalCAN = (totalVA_Global*0.05*0.4*0.75);
+			tauxR1 =  ((countClients * 100)/document.getElementById('doneR1').innerText).toFixed(1);          
+			tauxR2 = ((countClients * 100)/document.getElementById('doneR2').innerText).toFixed(1); 
+			tauxR2AV = ((clientsAV * 100)/countClients).toFixed(1);                                                     //((countR2 / (clientsAV || 1)) * 100).toFixed(1);
+			tauxR2PER = ((clientsPER * 100)/countClients).toFixed(1);
+			VaMoy_Client = totalVA_Global / countClients;
+			const tauxR2SCPI = ((countR2 / (clientsSCPI || 1)) * 100).toFixed(1);
+			const tauxR2IMMO = ((countR2 / (clientsIMMO || 1)) * 100).toFixed(1);
+			
+			totalEc_Global = totalVA_Global + totalPipe_Global;
+			totalEcVp_Global = totalVP_Global + totalPipeVp_Global;
+			totalVA_Total = totalVA_Global + totalPipe_Global + totalPot_Global;
+			totalVP_Total = totalVP_Global + totalPipeVp_Global + totalPotVp_Global;
+			
+            const rowClass = isLate ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-blue-50';
+            
+			const contactId = c.id; 
+			//tr.setAttribute('onclick', `openModalById('${contactId}')`);
+			//tr.className = "hover:bg-gray-50 cursor-pointer transition-colors border-b";  
+			const isChefDeFoyer = contacts.some(c_alt => c_alt.foyer_id === c.id);
+			const iconeFoyer = isChefDeFoyer ? `<span title="Chef d'un foyer" class="ml-1 text-indigo-500 text-sm">👥</span>` : "";
+			
+            html += `
+                <tr class="${rowClass} cursor-pointer transition border-b" onclick="openModalById('${contactId}')">
+                    <td data-label="Identité" class="p-4">
+                        <div class="font-bold text-gray-800">${c.nom.toUpperCase()} ${c.prenom} ${iconeFoyer}</div>
+                        <div class="text-[10px] text-gray-500">${c.age || '?'} ans - ${c.metier || ''}</div>
+                        ${isLate ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded font-black">⚠️ RETARD</span>' : ''}
+                    </td>
+                    <td data-label="Statut" class="p-4">
+                        <span class="px-2 py-1 rounded-full text-[10px] font-bold ${c.statut.includes('Client') ? 'status-client' : 'status-prospect'}">${c.statut}</span>
+                        <div class="text-[10px] text-blue-600 font-bold mt-1">${c.etape || ''}</div>
+                    </td>
+                    <td data-label="Cercle" class="p-4 text-[10px] font-medium text-gray-600">
+                        ${c.cercle}<br>${c.demarchage}
+                    </td>
+                    <td data-label="Contact" class="p-4 text-xs text-gray-500">
+                        ${c.tel || ''}<br><span class="italic">${c.email || ''}</span>
+                    </td>
+                    <td data-label="Montant" class="p-4">
+                        <div class="text-blue-700 font-bold">${vaIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VA</span></div>
+                        <div class="text-green-700 font-bold">${vpIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VP</span></div>
+                    </td>
+                    <td data-label="Infos" class="p-4 text-center">
+                         <div>${c.proprio === "true" || c.proprio === true ? '🏠' : ''}</div>
+						 <div>${c.notes || ''}</div>
+                    </td>
+                    <td data-label="RDV" class="p-4 text-center text-[15px] font-bold text-blue-600">
+    ${formatFR(c.daterdv)}
+</td>
+<td data-label="Relance" class="p-4 text-center font-bold text-[15px] ${isLate ? 'text-red-600' : 'text-blue-400'}">
+    ${formatFR(c.relance)}
+</td>
+                </tr>
+            `;
+        }
+    });
+
+    tableBody.innerHTML = html;
+    updateParrainsList();
+	// 3. Mise à jour de l'affichage du tableau de bord
+    document.getElementById('dashR1').innerText = countR1;
+    document.getElementById('dashR2').innerText = countR2;
+    document.getElementById('dashR3').innerText = countR3;
+
+    // Affichage des montants par produit
+    ['av', 'per', 'scpi', 'immo'].forEach(p => {
+        document.getElementById(`dashVA_${p.toUpperCase()}`).innerText = prodStats[p].va.toLocaleString() + " €";
+        document.getElementById(`dashVP_${p.toUpperCase()}`).innerText = prodStats[p].vp.toLocaleString() + " €";
+    });
+	
+    // Mise à jour des compteurs et stats
+    document.getElementById('counter').innerText = displayedCount;
+    document.getElementById('statVA').innerText = totalVA_Global.toLocaleString() + " €";
+	document.getElementById('statPipe').innerText = totalPipe_Global.toLocaleString() + " €";
+	document.getElementById('statPipeVp').innerText = totalPipeVp_Global.toLocaleString() + " €";
+	document.getElementById('statEc').innerText = totalEc_Global.toLocaleString() + " €";
+	document.getElementById('statEcVp').innerText = totalEcVp_Global.toLocaleString() + " €";
+	document.getElementById('statPot').innerText = totalPot_Global.toLocaleString() + " €";
+	document.getElementById('statPotVp').innerText = totalPotVp_Global.toLocaleString() + " €";
+    document.getElementById('statVP').innerText = totalVP_Global.toLocaleString() + " €";
+	document.getElementById('statVPM').innerText = totalVP_Mens.toLocaleString() + " €";
+	document.getElementById('statVATot').innerText = totalVA_Total.toLocaleString() + " €";
+	document.getElementById('statVPTot').innerText = totalVP_Total.toLocaleString() + " €";
+    document.getElementById('statProspects').innerText = countProspects;
+    document.getElementById('statClients').innerText = countClients;
+    document.getElementById('statRelances').innerText = countRetards;
+	document.getElementById('statMiseEnRelation').innerText = countMiseEnRelation;
+	document.getElementById('txR1Clt').innerText = tauxR1.toLocaleString() + " %";
+	document.getElementById('txR2Clt').innerText = tauxR2.toLocaleString() + " %";
+	document.getElementById('txR2AV').innerText = tauxR2AV.toLocaleString() + " %";
+	document.getElementById('txR2PER').innerText = tauxR2PER.toLocaleString() + " %";
+	document.getElementById('vaMoyClt').innerText = VaMoy_Client.toLocaleString() + " €";
+    
+    // Commission Estimée
+    document.getElementById('statCAB').innerText = (totalCAB).toLocaleString() + " € Brut"; 
+	document.getElementById('statCAN').innerText = (totalCAN).toLocaleString() + " € Net"; 
+}
+
+function updateAvanceStats() {
+    let avance = { r0:0, r1: 0, r2: 0, r3: 0, rx: 0, dm: 0, ad:0, tj:0 };
+    const today = new Date();
+	
+	const filtered = getFilteredContactsForRDV();
+	
+    filtered.forEach(c => {
+        // Fonction utilitaire pour vérifier si une date est dans le futur
+        const isFuture = (dateStr) => {
+            if (!dateStr) return false;
+            const d = new Date(dateStr);
+            return d > today;
+        };
+
+        if (isFuture(c.R0)) avance.r0++;
+		if (isFuture(c.R1)) avance.r1++;
+        if (isFuture(c.R2)) avance.r2++;
+        if (isFuture(c.R3)) avance.r3++;
+        if (isFuture(c.RX)) avance.rx++; // Assurez-vous que votre objet contact possède la clé RX
+		if (isFuture(c.DM)) avance.dm++;
+		if (isFuture(c.AD)) avance.ad++;
+		if (isFuture(c.TJ)) avance.tj++;
+		
+    });
+	
+	const avanceTotal = avance.r1 + avance.r2 + avance.r3 + avance.rx + avance.dm + avance.ad + avance.tj;
+	
+    // Mise à jour de l'affichage
+    if(document.getElementById('avanceR0')) document.getElementById('avanceR0').innerText = avance.r0;
+	if(document.getElementById('avanceR1')) document.getElementById('avanceR1').innerText = avance.r1;
+    if(document.getElementById('avanceR2')) document.getElementById('avanceR2').innerText = avance.r2;
+    if(document.getElementById('avanceR3')) document.getElementById('avanceR3').innerText = avance.r3;
+    if(document.getElementById('avanceRx')) document.getElementById('avanceRx').innerText = avance.rx;
+	if(document.getElementById('avanceDm')) document.getElementById('avanceDm').innerText = avance.dm;
+	if(document.getElementById('avanceAd')) document.getElementById('avanceAd').innerText = avance.ad;
+	if(document.getElementById('avanceTj')) document.getElementById('avanceTj').innerText = avance.tj;
+	if(document.getElementById('avanceTotal')) document.getElementById('avanceTotal').innerText = avanceTotal;
+}
+
+function updateRdvStats() {
+    // Supprimez l'alerte après le test réussi
+    console.log("Calcul des stats en cours..."); 
+    
+    let done = { r0:0, r1: 0, r2: 0, r3: 0, rx: 0, dm: 0, ad:0, tj:0 };
+    const auj = new Date();
+    
+    // On récupère la liste filtrée
+    const filtered = getFilteredContactsForRDV();
+        
+    filtered.forEach(c => {
+        const isPast = (dateStr) => {
+            if (!dateStr) return false;
+            const a = new Date(dateStr);
+            return a <= auj; // Inclure aujourd'hui
+        };
+
+        if (isPast(c.R0)) done.r0++;
+        if (isPast(c.R1)) done.r1++;
+        if (isPast(c.R2)) done.r2++;
+        if (isPast(c.R3)) done.r3++;
+        if (isPast(c.RX)) done.rx++; 
+        if (isPast(c.DM)) done.dm++;
+        if (isPast(c.AD)) done.ad++;
+        if (isPast(c.TJ)) done.tj++;
+    });
+
+    const doneTotal = done.r1 + done.r2 + done.r3 + done.rx + done.dm + done.ad + done.tj;
+
+    // Mise à jour du DOM
+    if(document.getElementById('doneR0')) document.getElementById('doneR0').innerText = done.r0;
+    if(document.getElementById('doneR1')) document.getElementById('doneR1').innerText = done.r1;
+    if(document.getElementById('doneR2')) document.getElementById('doneR2').innerText = done.r2;
+    if(document.getElementById('doneR3')) document.getElementById('doneR3').innerText = done.r3;
+    if(document.getElementById('doneRx')) document.getElementById('doneRx').innerText = done.rx;
+    if(document.getElementById('doneDm')) document.getElementById('doneDm').innerText = done.dm;
+    if(document.getElementById('doneAd')) document.getElementById('doneAd').innerText = done.ad;
+    if(document.getElementById('doneTj')) document.getElementById('doneTj').innerText = done.tj;
+    if(document.getElementById('doneTotal')) document.getElementById('doneTotal').innerText = doneTotal;
+}
+
+// --- GESTION MODALE ---
+function openModal(index) {
+    document.getElementById('contactModal').style.display = 'flex';
+    document.getElementById('btnDelete').style.display = index ? 'block' : 'none';
+    
+    if(index !== undefined) {
+        const c = contacts[index];
+        // Mapping de tous les champs
+        document.getElementById('f_id').value = c.id;
+        document.getElementById('f_nom').value = c.nom || "";
+        document.getElementById('f_prenom').value = c.prenom || "";
+        document.getElementById('f_genre').value = c.genre || "";
+        document.getElementById('f_anniv').value = formatDateForInput(c.anniv);
+        document.getElementById('f_age').value = parseInt(c.age) || 0;
+        document.getElementById('f_situfam').value = c.situfam || "";
+        document.getElementById('f_enfants').value = c.enfants || 0;
+		
+        document.getElementById('f_proprio').checked = (c.proprio === "true" || c.proprio === true);
+		document.getElementById('f_appel').checked = (c.appel === "true" || c.appel === true);
+		document.getElementById('f_udp').checked = (c.udp === "true" || c.udp === true);
+		document.getElementById('f_noire').checked = (c.noire === "true" || c.noire === true);
+        document.getElementById('f_metier').value = c.metier || "";
+        document.getElementById('f_relance').value = formatDateForInput(c.relance);
+        document.getElementById('f_tel').value = c.tel || "";
+        document.getElementById('f_email').value = c.email || "";
+        document.getElementById('f_adresse').value = c.adresse || "";
+        document.getElementById('f_cercle').value = c.cercle || "Froid";
+        document.getElementById('f_demarchage').value = c.demarchage || "NQ";
+        document.getElementById('f_statut_global').value = c.statut || "Prospect";
+        document.getElementById('f_etape').value = c.etape || "En cours";
+        document.getElementById('f_daterdv').value = formatDateForInput(c.daterdv);
+		document.getElementById('f_recommandation').value = c.recommandation || "";
+		document.getElementById('f_campagnes').value = c.campagnes || "";
+		document.getElementById('f_pipe').value = c.pipe || "";
+		document.getElementById('f_pipe_vp').value = c.pipe_vp || "";
+		document.getElementById('f_pot').value = c.pot || "";
+		document.getElementById('f_pot_vp').value = c.pot_vp || "";
+        
+        // Solutions
+        document.getElementById('sol_av_m').value = c.sol_av_m || 0;
+        document.getElementById('sol_av_v').value = c.sol_av_v || 0;
+        document.getElementById('sol_per_m').value = c.sol_per_m || 0;
+        document.getElementById('sol_per_v').value = c.sol_per_v || 0;
+        document.getElementById('sol_scpi_m').value = c.sol_scpi_m || 0;
+        document.getElementById('sol_scpi_v').value = c.sol_scpi_v || 0;
+        document.getElementById('sol_immo_m').value = c.sol_immo_m || 0;
+        document.getElementById('sol_immo_v').value = c.sol_immo_v || 0;
+        
+        document.getElementById('f_notes').value = c.notes || "";
+        document.getElementById('f_histo').value = c.histo || "";
+		
+		document.getElementById('f_r0').value = formatDateForInput(c.R0);
+		document.getElementById('f_r1').value = formatDateForInput(c.R1);
+		document.getElementById('f_r2').value = formatDateForInput(c.R2);
+		document.getElementById('f_r3').value = formatDateForInput(c.R3);
+		document.getElementById('f_rx').value = formatDateForInput(c.RX);
+		document.getElementById('f_dm').value = formatDateForInput(c.DM);
+		document.getElementById('f_ad').value = formatDateForInput(c.AD);
+		document.getElementById('f_tj').value = formatDateForInput(c.TJ);
+		
+		const fIdField = document.getElementById('f_foyer_id');
+		const fNomField = document.getElementById('f_foyer_nom');
+		const membresFoyer = contacts.filter(m => m.foyer_id === c.id);
+		const statusDiv = document.getElementById('foyer_status');
+		fIdField.value = c.foyer_id || "";
+    
+    if (c.foyer_id) {
+        // On cherche le nom du chef pour l'afficher dans le champ texte
+        const chef = contacts.find(x => x.id === c.foyer_id);
+        fNomField.value = chef ? `${chef.nom} ${chef.prenom}` : "ID: " + c.foyer_id;
+        document.getElementById('btn_delier').classList.remove('hidden');
+        document.getElementById('foyer_status').innerText = "Rattaché au foyer";
+    } else {
+        fNomField.value = "";
+        document.getElementById('btn_delier').classList.add('hidden');
+        document.getElementById('foyer_status').innerText = "";
+    }
+    
+	if (membresFoyer.length > 0) {
+    let listeNoms = membresFoyer.map(m => m.nom + " " + m.prenom).join(", ");
+    statusDiv.innerHTML = `<span class="text-indigo-600">🏠 Chef de foyer. Membres rattachés : <strong>${listeNoms}</strong></span>`;
+} else if (c.foyer_id) {
+    const chef = contacts.find(x => x.id === c.foyer_id);
+    statusDiv.innerHTML = `👤 Rattaché au foyer de : <strong>${chef ? chef.nom + " " + chef.prenom : 'Inconnu'}</strong>`;
+} else {
+    statusDiv.innerText = "";
+}
+    
+        calcTotals();
+        toggleClientFields();
+		
+    } else {
+        document.querySelectorAll('#contactModal input:not([type=checkbox]), #contactModal textarea, #contactModal select').forEach(i => i.value = "");
+        document.querySelectorAll('#contactModal input[type=checkbox]').forEach(i => i.checked = false);
+        document.getElementById('f_id').value = "";
+		document.getElementById('f_age').value = 0; // Sécurité âge
+        document.getElementById('f_statut_global').value = "Prospect";
+        document.getElementById('f_cercle').value = "Froid";
+        document.getElementById('f_demarchage').value = "NQ";
+		document.getElementById('f_recommandation').value = "";
+        calcTotals();
+        toggleClientFields();
+		
+    }
+}
+
+function closeModal() { document.getElementById('contactModal').style.display = 'none'; }</script>
+</body>
+</html>
