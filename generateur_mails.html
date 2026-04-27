@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur CR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-75 min-h-screen py-10 px-4 font-sans text-slate-1200">
+
+    <div x-data="patrimoineApp()" class="max-w-7xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden border border-slate-200">
+        
+        <div class="bg-slate-800 p-6 text-white text-center">
+            <h1 class="text-2xl font-bold uppercase tracking-wider">Génération de comptes-rendus</h1>
+        </div>
+
+        <div class="p-8">
+            <div class="flex flex-wrap gap-6 mb-8 border-b pb-8 items-end grid grid-cols-1 md:grid-cols-6 gap-8">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Type de Compte-Rendu</label>
+                    <select x-model="config.type" @change="checkType" class="w-full border-slate-300 rounded-lg shadow-sm bg-blue-50/50">
+                        <template x-for="t in types" :key="t">
+                            <option :value="t" x-text="t"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="w-40">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Date RDV</label>
+                    <input type="date" x-model="form.dateR1" class="w-full border-slate-300 rounded-lg shadow-sm">
+                </div>
+                <div class="w-32">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Heure RDV</label>
+                    <input type="time" x-model="form.heureR1" class="w-full border-slate-300 rounded-lg shadow-sm">
+                </div>
+                <div x-show="isFullR1" class="w-40">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Date futur RDV</label>
+                    <input type="date" x-model="form.dateR2" class="w-full border-slate-300 rounded-lg shadow-sm">
+                </div>
+                <div x-show="isFullR1" class="w-32">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Heure futur RDV</label>
+                    <input type="time" x-model="form.heureR2" class="w-full border-slate-300 rounded-lg shadow-sm">
+                </div>
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Lien Visio</label>
+                    <input type="text" x-model="form.visio" placeholder="https://..." class="w-full border-slate-300 rounded-lg shadow-sm">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-8">
+                <template x-if="!isR2">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-6 p-6 bg-slate-50 rounded-xl border border-slate-200">
+                            <h2 class="font-bold text-lg text-blue-800 border-b pb-2">Conjoint 1</h2>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase">Prénom</label>
+                                <input type="text" x-model="form.prenom1" class="w-full mt-1 border-slate-300 rounded-md">
+                            </div>
+                            
+                            <div x-show="isFullR1" x-transition class="space-y-6">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="text" x-model="form.epargneP1" placeholder="Épargne Préc. (€)" class="border-slate-300 rounded-md">
+                                    <input type="text" x-model="form.epargneM1" placeholder="Épargne Mens. (€)" class="border-slate-300 rounded-md">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-xs font-bold text-blue-700 italic">Objectifs C1</label>
+                                    <template x-for="i in [1,2,3,4]" :key="'c1obj'+i">
+                                        <select x-model="form['c1_obj'+i]" class="w-full text-xs border-slate-200 rounded-md">
+                                            <option value="">-- Aucun --</option>
+                                            <template x-for="opt in listeObjectifs" :key="opt">
+                                                <option :value="opt" x-text="opt"></option>
+                                            </template>
+                                        </select>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div x-show="isDuo" class="space-y-6 p-6 bg-emerald-50/30 rounded-xl border border-emerald-100">
+                            <h2 class="font-bold text-lg text-emerald-800 border-b pb-2">Conjoint 2</h2>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase">Prénom</label>
+                                <input type="text" x-model="form.prenom2" class="w-full mt-1 border-slate-300 rounded-md">
+                            </div>
+                            
+                            <div x-show="isFullR1" x-transition class="space-y-6">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input type="text" x-model="form.epargneP2" placeholder="Épargne Préc. (€)" class="border-slate-300 rounded-md">
+                                    <input type="text" x-model="form.epargneM2" placeholder="Épargne Mens. (€)" class="border-slate-300 rounded-md">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-xs font-bold text-emerald-700 italic">Objectifs C2</label>
+                                    <template x-for="i in [1,2,3,4]" :key="'c2obj'+i">
+                                        <select x-model="form['c2_obj'+i]" class="w-full text-xs border-slate-200 rounded-md">
+                                            <option value="">-- Aucun --</option>
+                                            <template x-for="opt in listeObjectifs" :key="opt">
+                                                <option :value="opt" x-text="opt"></option>
+                                            </template>
+                                        </select>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template x-if="isR2">
+                    <div class="space-y-6 p-8 bg-indigo-50/50 rounded-xl border-2 border-indigo-100">
+                        <h2 class="font-bold text-xl text-indigo-800 border-b pb-4 mb-6">Récapitulatif des Préconisations (R2)</h2>
+                        <div class="grid grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 uppercase">Prénom Conjoint 1</label>
+                                <input type="text" x-model="form.prenom1" class="w-full mt-1 border-slate-300 rounded-md shadow-sm">
+                            </div>
+                            <div x-show="isDuo">
+                                <label class="block text-xs font-bold text-slate-500 uppercase">Prénom Conjoint 2</label>
+                                <input type="text" x-model="form.prenom2" class="w-full mt-1 border-slate-300 rounded-md shadow-sm">
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[1000px]">
+                                <thead>
+                                    <tr class="text-[10px] uppercase text-slate-400 border-b">
+                                        <th class="pb-2">Solution</th>
+                                        <th class="pb-2">Mt C1</th>
+										<th class="pb-2">VP C1</th>
+                                        <th class="pb-2" x-show="isDuo">Mt C2</th>
+										<th class="pb-2" x-show="isDuo">VP C2</th>
+                                        <th class="pb-2">Horizon</th>
+                                        <th class="pb-2">Bénéf.</th>
+                                        <th class="pb-2">Éco Impôt</th>
+                                        <th class="pb-2">Apport</th>
+                                        <th class="pb-2">Revenus</th>
+                                        <th class="pb-2">Effort</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200">
+                                    <template x-for="(sol, index) in form.solutions" :key="index">
+                                        <tr>
+                                            <td class="py-3 pr-2">
+                                                <select x-model="sol.nom" class="w-full text-xs border-slate-200 rounded-md bg-white">
+                                                    <option value="">-- Choisir --</option>
+                                                    <template x-for="opt in listeSolutions" :key="opt">
+                                                        <option :value="opt" x-text="opt"></option>
+                                                    </template>
+                                                </select>
+                                            </td>
+                                            <td class="py-2 pr-1"><input type="text" x-model="sol.montant1" class="w-full text-xs border-slate-200 rounded-md"></td>
+											<td class="py-2 pr-1"><input type="text" x-model="sol.vp1" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2 pr-1" x-show="isDuo"><input type="text" x-model="sol.montant2" class="w-full text-xs border-slate-200 rounded-md"></td>
+											<td class="py-2 pr-1" x-show="isDuo"><input type="text" x-model="sol.vp2" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2 pr-1"><input type="text" x-model="sol.horizon" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2 pr-1"><input type="text" x-model="sol.beneficiaire" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2 pr-1"><input type="text" x-model="sol.ecoImpots" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2 pr-1"><input type="text" x-model="sol.apport" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2 pr-1"><input type="text" x-model="sol.revenus" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                            <td class="py-2"><input type="text" x-model="sol.effort" class="w-full text-xs border-slate-200 rounded-md"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div x-show="isFullR1 || isR2" x-transition class="mt-8 p-6 bg-slate-800 rounded-xl text-white">
+                <h3 class="text-sm font-bold uppercase text-slate-400 mb-4">Projets et Mises en Relation</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 gap-2">
+                        <template x-for="i in [1,2,3,4]" :key="'proj'+i">
+                            <div class="flex space-x-2">
+                                <input type="text" x-model="form['proj'+i]" :placeholder="'Nom du projet ' + i" class="flex-1 text-sm border-none rounded bg-slate-700 text-white placeholder-slate-500">
+                                <input type="text" x-model="form['val'+i]" placeholder="Montant (€)" class="w-32 text-sm border-none rounded bg-slate-700 text-white placeholder-slate-500">
+                            </div>
+                        </template>
+                    </div>
+                    <div>
+                        <textarea x-model="form.relation" rows="4" placeholder="Personnes déjà évoquées pour mise en relation..." class="w-full text-sm border-none rounded bg-slate-700 text-white p-3"></textarea>
+                    </div>
+                </div>
+            </div>
+			
+						
+            <div class="mt-10 flex flex-col items-center">
+                <button @click="if(validateForm()) copyRichText()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-12 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 inline-flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    COPIER LE COMPTE-RENDU
+                </button>
+                <p x-show="copied" x-transition class="mt-4 text-emerald-600 font-bold bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200">
+                    ✓ Contenu copié ! Collez-le (CTRL+V) dans votre mail.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="rich-render" style="display:none;"></div>
+
+    <script>
+        function patrimoineApp() {
+            return {
+                types: ['R1-T', 'R1-V', 'R1-sd-T', 'R1-sd-V', 'R1-CR-T', 'R1-CR-V', 'R2-CR-T', 'R2-CR-V'],
+                isDuo: false,
+                isR2: false,
+                isFullR1: false, // Nouvelle propriété pour les types CR
+                copied: false,
+                config: { type: 'R1-CR-T' },
+                listeObjectifs: ["Optimiser la fiscalité de vos revenus", "Préparer votre retraite", "Accompagner vos enfants", "Optimiser la rentabilité de vos placements financiers", "Se constituer un patrimoine immobilier", "Compléter vos revenus régulièrement", "Se constituer une épargne financière", "Réorganiser votre patrimoine", "Diversifier votre patrimoine", "Optimiser la rentabilité de votre patrimoine", "Optimiser la rentabilité de votre patrimoine immobilier locatif", "Disposer de revenus ponctuellement", "Optimiser la fiscalité de votre patrimoine (IFI)", "Préparer la transmission de votre entreprise", "Optimiser la fiscalité de la transmission", "Protéger vos proches", "Protéger votre conjoint survivant", "Protéger vos enfants", "Transmettre votre patrimoine", "Se prémunir contre les accidents de la vie"],
+                listeSolutions: ["Assurance Vie", "PER", "SCPI rendement - démembrement", "SCPI rendement - financement", "SCPI rendement cash", "FIP/FCPI", "NOVAXIA ONE", "APRIL délégation d'assurance", "G3F"],
+                
+                form: { 
+                    prenom1: '', prenom2: '', epargneP1: '', epargneM1: '', epargneP2: '', epargneM2: '', 
+                    c1_obj1: '', c1_obj2: '', c1_obj3: '', c1_obj4: '', 
+                    c2_obj1: '', c2_obj2: '', c2_obj3: '', c2_obj4: '', 
+                    proj1: '', val1: '', proj2: '', val2: '', proj3: '', val3: '', proj4: '', val4: '', 
+                    relation: '', dateR1: '', heureR1: '', dateR2: '', heureR2: '', visio: '',
+                    solutions: Array.from({ length: 4 }, () => ({
+                        nom: '', montant1: '', vp1: '', montant2: '', vp2: '', horizon: '', 
+                        beneficiaire: '', ecoImpots: '', apport: '', 
+                        revenus: '', effort: ''
+                    }))
+                },
+
+                // Initialisation au chargement
+                init() {
+                    this.checkType();
+                },
+
+                checkType() { 
+                    this.isDuo = this.config.type.endsWith('V'); 
+                    this.isR2 = (this.config.type === 'R2-CR-T' || this.config.type === 'R2-CR-V');
+                    // Définit si on doit afficher le bloc financier (Uniquement pour les types R1-CR)
+                    this.isFullR1 = (this.config.type === 'R1-CR-T' || this.config.type === 'R1-CR-V');
+                },
+
+				validateForm() {
+                    const f = this.form;
+                    const errors = [];
+                    const type = this.config.type;
+
+                    // Validation de base pour tous
+                    if (!f.dateR1) errors.push("Date du RDV manquante");
+                    if (!f.heureR1) errors.push("Heure du RDV manquante");
+                    if (!f.prenom1) errors.push("Prénom du conjoint 1 manquant");
+                    if (this.isDuo && !f.prenom2) errors.push("Prénom du conjoint 2 manquant");
+                    if (!f.visio) errors.push("Lien visio manquant");
+
+                    // Validation spécifique CR
+                    if (this.isFullR1) {
+                        if (!f.dateR2) errors.push("Date du futur RDV manquante");
+                        if (!f.heureR2) errors.push("Heure du futur RDV manquante");
+                        if (!f.epargneP1) errors.push("Épargne actuelle conjoint 1 manquante");
+                        if (!f.epargneM1) errors.push("Épargne mensuelle conjoint 1 manquante");
+                        
+                        const hasObjC1 = [f.c1_obj1, f.c1_obj2, f.c1_obj3, f.c1_obj4].some(val => val && val.trim() !== "");
+                        if (!hasObjC1) errors.push("Au moins un objectif pour " + (f.prenom1 || "Conjoint 1"));
+
+                        if (this.isDuo) {
+                            if (!f.epargneP2) errors.push("Épargne actuelle conjoint 2 manquante");
+                            if (!f.epargneM2) errors.push("Épargne mensuelle conjoint 2 manquante");
+                            const hasObjC2 = [f.c2_obj1, f.c2_obj2, f.c2_obj3, f.c2_obj4].some(val => val && val.trim() !== "");
+                            if (!hasObjC2) errors.push("Au moins un objectif pour " + (f.prenom2 || "Conjoint 2"));
+                        }
+                    }
+
+                    if (errors.length > 0) {
+                        alert("Attention, champs obligatoires manquants :\n- " + errors.join("\n- "));
+                        return false;
+                    }
+                    return true;
+                },
+
+                renderSolutionsTable(isVous) {
+                    var sols = this.form.solutions.filter(function(s) { return s.nom !== ''; });
+                    if (sols.length === 0) return "";
+
+                    var bleuBcn = "#9CC2E5";
+                    var thStyle = "padding:2px; border:0px   font-size:10px; text-transform:uppercase; text-align:left;";
+                    var tdStyleSol = "width:200px; padding:2px; border:0px  font-size:10px; vertical-align:top; color:#000000; text-align:left;";
+                    var tdStyle = "padding:2px; border:0px  font-size:10px; vertical-align:middle; text-align:left; color:#000000;";
+
+                    var html = '<table style="width:100%; border-collapse:collapse; margin:2px 0; font-family:sans-serif; border:0px ">';
+                    html += '<thead><tr><th style="' + thStyle + ' :">Solution(s) préconisée(s) :</th></tr></thead><tbody>';
+							<!-- <th style="' + thStyle + ' width:80%;">Détail</th> -->
+
+                    for (var i = 0; i < sols.length; i++) {
+                        var s = sols[i];
+                        var detailStr = "";
+                        if (s.nom === 'Assurance Vie' || s.nom === 'PER') {
+                            var p1 = this.isDuo ? "<strong>" + this.form.prenom1 + " : </strong>" : "";
+                            var mnt = p1 + (s.montant1 || '0') + " €" + (s.vp1 ? " + " + s.vp1 + " €/m" : "");
+                            if (this.isDuo) {
+                                var p2 = "<strong>" + this.form.prenom2 + " : </strong>";
+                                mnt += ", " + p2 + (s.montant2 || '0') + " €" + (s.vp2 ? " + " + s.vp2 + " €/m" : "");
+                            }
+                            detailStr += "<strong>Objectifs</strong> : Rentabilité, Retraite, Transmission, Protection famille, Épargne.<br>";
+                            detailStr += "<strong>Bénéficiaire</strong> : " + s.beneficiaire + "<br>";
+                            detailStr += "<strong>Répartition</strong> : " + mnt;
+                        } else {
+                            detailStr += "<strong>Objectifs</strong> : Rentabilité, Retraite, Transmission, Protection famille.<br>";
+                            detailStr += "<strong>Montant</strong> : " + (s.montant1 || '0') + " €<br>";
+                            if(s.apport) detailStr += "<strong>Apport</strong> : " + s.apport + " €<br>";
+                            if(s.horizon) detailStr += "<strong>Horizon</strong> : " + s.horizon + " ans<br>";
+                            if(s.revenus) detailStr += "<strong>Revenus générés</strong> : " + s.revenus + " €<br>";
+                            if(s.effort) detailStr += "<strong>Effort mensuel</strong> : " + s.effort + " €<br>";
+                        }
+                        html += '<tr><td style="' + tdStyleSol + '"><strong><u>' + s.nom + '</strong></u></td><td style="' + tdStyle + '">' + detailStr + '</td></tr>';
+						
+                    }
+                    html += '</tbody></table>';
+                    return html;
+                },
+
+                async copyRichText() {
+                    const renderZone = document.getElementById('rich-render');
+                    const formatDateFR = (dateString) => {
+                        if (!dateString) return 'JJ/MM/AAAA';
+                        const [year, month, day] = dateString.split('-');
+                        return `${day}/${month}/${year}`;
+                    };
+					
+					const formatHeureFR = (timeString) => {
+						if (!timeString) return 'HHhMM';
+						const [hour, minute] = timeString.split(':');
+						return `${hour}h${minute}`;
+                    };
+					
+                    const dateFormateeR1 = formatDateFR(this.form.dateR1);
+                    const dateFormateeR2 = formatDateFR(this.form.dateR2);
+					const heureFormateeR1 = formatHeureFR(this.form.heureR1);
+					const heureFormateeR2 = formatHeureFR(this.form.heureR2);
+                    
+                    let objListC1 = [this.form.c1_obj1, this.form.c1_obj2, this.form.c1_obj3, this.form.c1_obj4].filter(x => x).map(x => `<li>${x}</li>`).join('');
+                    let objListC2 = [this.form.c2_obj1, this.form.c2_obj2, this.form.c2_obj3, this.form.c2_obj4].filter(x => x).map(x => `<li>${x}</li>`).join('');
+                    let projListHTML = "";
+                    for(let i=1; i<=4; i++) if(this.form['proj'+i]) projListHTML += `<li>${this.form['proj'+i]} : ${this.form['val'+i] || 'XXXX'} €</li>`;
+
+                    const relationText = this.form.relation ? `<strong>${this.form.relation}</strong>` : "...";
+                    let urlVisio = this.form.visio;
+                    if (urlVisio && !urlVisio.startsWith('http')) urlVisio = 'https://' + urlVisio;
+                    const lienHTML = urlVisio ? `<a href="${urlVisio}" style="color: #2563eb; text-decoration: underline;">RDV VISIO</a>` : `<strong>(Lien visio à communiquer)</strong>`;
+
+                    const templates = {
+                        'R2-CR-T': `
+                            <p><strong>Conseil patrimonial : compte-rendu du ${dateFormateeR1}</strong></p>
+							<p><br></p>
+                            <p>Bonjour ${this.form.prenom1},</p>
+                            <p>Je te joins les éléments relatifs à ton étude de dossier et à la solution présentée et validée aujourd’hui.</p>
+							<p><strong>Encore félicitations pour notre premier contrat ensemble et merci pour ta confiance.</strong></p>
+                            ${this.renderSolutionsTable(false)}
+							<p><br></p>
+							<p>Tu trouveras ci-joint les documents liés à cette solution.</p>
+							<p><br></p>
+                            <p><strong>- Actions :</strong></p>
+							<p>@Toi : m’envoyer les documents nécessaires à la souscription :</p>
+							<ul>
+								<li>Passeport ou Carte d’identité valide : signé, recto-verso (CNI) ou 2 pages (passeport), droit, non flou, non coupé</li>
+								<li>RIB : <strong>en pdf, avec logo, nom et adresse de la banque</strong><li>
+								<li>Justificatif de domicile < 3 mois - facture seulement : nom complet visible de chacun (en 1 ou 2 documents)</li>
+							</ul>
+							<p><br></p>
+							<p><strong>- Mises en relation :</strong></p>
+                            <p>En général, les personnes satisfaites de ma démarche me mettent en relation avec <strong>4 personnes</strong>. Je te laisse donc réfléchir à d’autres personnes concernées dans votre entourage : <strong>amis, famille, collègue et loisir</strong>.</p>
+							<p>Je te propose maintenant de leur en parler, et voici quelques mots pour t'y aider :<br>
+                            <i>« Je connais quelqu’un qui m’aide dans l’organisation de l’épargne, la protection de la famille, la préparation de la retraite et la réduction d’impôts. Je me suis dit que tu serais concerné ! Si tu es d’accord, je lui communique ton numéro mobile. Comme ça, elle t’enverra un sms pour convenir d’un appel téléphonique. Elle ne t’appellera pas sans ton accord et en plus, elle ne facture aucun honoraire. »</i></p>
+                            <p>Je compte sur toi, car nous en reparlerons lors de notre prochain rendez-vous !</p>
+							<p><br></p>
+							<p><strong>- Prochain rendez-vous :</strong></p>
+							<p>Je te recontacterai pour valider la solution proposée le ${dateFormateeR2} à ${heureFormateeR2} : ${lienHTML}</p>
+							<p><br></p>
+							<p>En attendant, je reste à ta disposition pour toutes questions.</p>
+                        `,
+                        'R2-CR-V': `
+                            <p><strong>Conseil patrimonial : compte-rendu du ${dateFormateeR1}</strong></p>
+							<p><br></p>
+                            <p>Bonjour ${this.form.prenom1} et ${this.form.prenom2},</p>
+                            <p>Je vous joins les éléments relatifs à votre étude de dossier et à la solution présentée et validée aujourd’hui.</p>
+							<p><strong>Encore félicitations pour notre premier contrat ensemble et merci pour votre confiance.</strong></p>
+                            ${this.renderSolutionsTable(false)}
+							<p><br></p>
+							<p>Vous trouverez ci-joint les documents liés à cette solution.</p>
+							<p><br></p>
+                            <p><strong>- Actions :</strong></p>
+							<p>@Vous : m’envoyer les documents nécessaires à la souscription :</p>
+							<ul>
+								<li>Passeport ou Carte d’identité valide : signé, recto-verso (CNI) ou 2 pages (passeport), droit, non flou, non coupé</li>
+								<li>RIB : <strong>en pdf, avec logo, nom et adresse de la banque</strong><li>
+								<li>Justificatif de domicile < 3 mois - facture seulement : nom complet visible de chacun (en 1 ou 2 documents)</li>
+							</ul>
+							<p><br></p>
+							<p><strong>- Mises en relation :</strong></p>
+                            <p>En général, les personnes satisfaites de ma démarche me mettent en relation avec <strong>4 personnes</strong>. Je vous laisse donc réfléchir à d’autres personnes concernées dans votre entourage : <strong>amis, famille, collègue et loisir</strong>.</p>
+							<p>Je vous propose maintenant de leur en parler, et voici quelques mots pour vous y aider :<br>
+                            <i>« Je connais quelqu’un qui m’aide dans l’organisation de l’épargne, la protection de la famille, la préparation de la retraite et la réduction d’impôts. Je me suis dit que tu serais concerné ! Si tu es d’accord, je lui communique ton numéro mobile. Comme ça, elle t’enverra un sms pour convenir d’un appel téléphonique. Elle ne t’appellera pas sans ton accord et en plus, elle ne facture aucun honoraire. »</i></p>
+                            <p>Je compte sur toi, car nous en reparlerons lors de notre prochain rendez-vous !</p>
+							<p><br></p>
+							<p><strong>- Prochain rendez-vous :</strong></p>
+							<p>Je vous recontacterai pour valider la solution proposée le ${dateFormateeR2} à ${heureFormateeR2} : ${lienHTML}</p>
+							<p><br></p>
+							<p>En attendant, je reste à votre disposition pour toutes questions.</p>
+                        `,
+                        'R1-T': `<p><strong>Conseil patrimonial : rendez-vous du ${dateFormateeR1} à ${heureFormateeR1}</strong></p>
+						<p><br></p>
+						<p>Bonjour ${this.form.prenom1 || '...'},</p>
+						<p><br></p>
+						<p>Comme convenu, je te confirme notre rendez-vous du ${dateFormateeR1} à ${heureFormateeR1} en visio en suivant le lien Google Meet ci-dessous :</p>
+						<p>${lienHTML} ${dateFormateeR1} à ${heureFormateeR1}</p>
+						  
+						<p>Pour ce premier rendez-vous, il faudra compter 1h30 à 2h au calme.</p>
+						<p>Afin d'être le plus efficace possible le moment venu, je te remercie de bien vouloir préparer les informations suivantes :</p>
+						<ul>
+							<li>avis d'imposition 2024 et 2025</li>
+							<li>comptes et livrets bancaires : tu peux t'aider du fichier en PJ si tu le souhaites</li>
+							<li>assurances vie : montant, date d’ouverture et bénéficiaires</li>
+							<li>plans d’épargne entreprise : montant total et ce qui est déjà disponible</li>
+							<li>plans d’épargne retraite individuels : montant total</li>
+							<li>résidence principale : loyers ou valeur d'acquisition et actuelle (estimation si nécessaire sur site meilleurs agents)</li>
+							<li>prêts en cours : mensualité, durée, taux, capital restant dû, date échéance</li>
+							<li>prépare aussi tes codes de connexion pour le site de la retraite : https://www.info-retraite.fr/ (il est accessible au travers de FranceConnect)</li></ul>
+						<p>Ou toutes autres informations que tu jugeras utiles pour l’étude à mener.</p>
+						<p>Si tu le souhaites, tu peux m'envoyer en avance toutes les informations ci-dessus.</p>
+						<p>En effet, cela nous permettra de gagner du temps et de se concentrer sur l’essentiel lors du rendez-vous.
+						<br></p> 
+						<p>Comme évoqué lors de notre conversation, j’ai la singularité de ne pas facturer d’honoraires, cela afin de continuer à rendre accessible mes services au plus grand nombre et dans la durée.</p>
+						<p>En contrepartie, la seule chose que je demande, si tu es satisfait de la démarche entreprise ensemble, c’est de me mettre en relation avec ton entourage (amis, collègues ou famille), susceptibles d'avoir besoin de mon accompagnement sur l'optimisation de l'épargne, la protection de la famille, la préparation de la retraite ou encore la réduction d'impôts.
+						<br></p> 
+						<p>N’hésite pas à revenir vers moi si besoin, bonne fin de semaine,</p>`,
+						'R1-V': `<p><strong>Conseil patrimonial : rendez-vous du ${dateFormateeR1} à ${heureFormateeR1}</strong></p>
+						<p><br></p>
+						<p>Bonjour ${this.form.prenom1 || '...'} et ${this.form.prenom2 || '...'},</p>
+						<p><br></p>
+						<p>Comme convenu, je vous confirme notre rendez-vous du ${dateFormateeR1} à ${heureFormateeR1} en visio en suivant le lien Google Meet ci-dessous :</p>
+						<p>${lienHTML} ${dateFormateeR1} à ${heureFormateeR1}</p>
+						  
+						<p>Pour ce premier rendez-vous, il faudra compter 1h30 à 2h au calme.</p>
+						<p>Afin d'être le plus efficace possible le moment venu, je vous remercie de bien vouloir préparer les informations suivantes :</p>
+						<ul>
+							<li>avis d'imposition 2024 et 2025</li>
+							<li>comptes et livrets bancaires : vous pouvez vous aider du fichier en PJ si vous le souhaitez</li>
+							<li>assurances vie : montant, date d’ouverture et bénéficiaires</li>
+							<li>plans d’épargne entreprise : montant total et ce qui est déjà disponible</li>
+							<li>plans d’épargne retraite individuels : montant total</li>
+							<li>résidence principale : loyers ou valeur d'acquisition et actuelle (estimation si nécessaire sur site meilleurs agents)</li>
+							<li>prêts en cours : mensualité, durée, taux, capital restant dû, date échéance</li>
+							<li>préparez aussi vos codes de connexion pour le site de la retraite : https://www.info-retraite.fr/ (il est accessible au travers de FranceConnect)</li>
+						</ul>
+						<p>Ou toutes autres informations que vous jugerez utiles pour l’étude à mener.</p>
+						<p>Si vous le souhaitez, vous pouvez m'envoyer en avance toutes les informations ci-dessus.</p>
+						<p>En effet, cela nous permettra de gagner du temps et de se concentrer sur l’essentiel lors du rendez-vous.
+						<br></p> 
+						<p>Comme évoqué lors de notre conversation, j’ai la singularité de ne pas facturer d’honoraires, cela afin de continuer à rendre accessible mes services au plus grand nombre et dans la durée.</p>
+						<p>En contrepartie, la seule chose que je demande, si vous êtes satisfaits de la démarche entreprise ensemble, c’est de me mettre en relation avec votre entourage (amis, collègues ou famille), susceptibles d'avoir besoin de mon accompagnement sur l'optimisation de l'épargne, la protection de la famille, la préparation de la retraite ou encore la réduction d'impôts.
+						<br></p> 
+						<p>N’hésitez pas à revenir vers moi si besoin, bonne fin de semaine,</p>`,
+                        'R1-sd-T': `<p><strong>Conseil patrimonial : rendez-vous du ${dateFormateeR1} à ${heureFormateeR1}</strong></p>
+						<p><br></p>
+						<p>Bonjour ${this.form.prenom1 || '...'},</p>
+						<p><br></p>
+						<p>Comme convenu, je te confirme notre rendez-vous du ${dateFormateeR1} à ${heureFormateeR1} en visio en suivant le lien Google Meet ci-dessous :</p>
+						<p>${lienHTML} ${dateFormateeR1} à ${heureFormateeR1}</p>
+						  
+						<p>Pour ce premier rendez-vous, il faudra compter 1h30 à 2h au calme.
+						<br></p> 
+						<p>Comme évoqué lors de notre conversation, j’ai la singularité de ne pas facturer d’honoraires, cela afin de continuer à rendre accessible mes services au plus grand nombre et dans la durée.</p>
+						<p>En contrepartie, la seule chose que je demande, si tu es satisfait de la démarche entreprise ensemble, c’est de me mettre en relation avec ton entourage (amis, collègues ou famille), susceptibles d'avoir besoin de mon accompagnement sur l'optimisation de l'épargne, la protection de la famille, la préparation de la retraite ou encore la réduction d'impôts.
+						<br></p> 
+						<p>N’hésite pas à revenir vers moi si besoin, bonne fin de semaine,</p>`,
+                        'R1-sd-V': `<p><strong>Conseil patrimonial : rendez-vous du ${dateFormateeR1} à ${heureFormateeR1}</strong></p>
+						<p><br></p>
+						<p>Bonjour ${this.form.prenom1 || '...'} et ${this.form.prenom2 || '...'},</p>
+						<p><br></p>
+						<p>Comme convenu, je vous confirme notre rendez-vous du ${dateFormateeR1} à ${heureFormateeR1} en visio en suivant le lien Google Meet ci-dessous :</p>
+						<p>${lienHTML} ${dateFormateeR1} à ${heureFormateeR1}</p>
+						  
+						<p>Pour ce premier rendez-vous, il faudra compter 1h30 à 2h au calme.
+						<br></p> 
+						<p>Comme évoqué lors de notre conversation, j’ai la singularité de ne pas facturer d’honoraires, cela afin de continuer à rendre accessible mes services au plus grand nombre et dans la durée.</p>
+						<p>En contrepartie, la seule chose que je demande, si vous êtes satisfaits de la démarche entreprise ensemble, c’est de me mettre en relation avec votre entourage (amis, collègues ou famille), susceptibles d'avoir besoin de mon accompagnement sur l'optimisation de l'épargne, la protection de la famille, la préparation de la retraite ou encore la réduction d'impôts.
+						<br></p> 
+						<p>N’hésitez pas à revenir vers moi si besoin, bonne fin de semaine,</p>`,
+                        'R1-CR-T': `<p><strong>Conseil patrimonial : compte-rendu du ${dateFormateeR1}</strong></p>
+							<p><br></p>
+                            <p>Bonjour ${this.form.prenom1 || '...'},</p>
+                            <p>Tu trouveras ci-après les différents points abordés lors de notre entretien :</p>
+                            <p><br></p>
+							<p><strong>1) Situation actuelle :</strong></p>
+                            <ul>
+                                <li><strong>Document Entrée en Relation :</strong> document réglementaire, que tu vas également recevoir en signature électronique "Votre consultant vous invite à signer des documents". Attention, il peut se trouver dans les spams.</li>
+                                <li><strong>Recueil d’informations :</strong> récapitulatif de nos échanges, à relire pour apporter des compléments le cas échéant.</li>
+                            </ul>
+                            <p>Peux-tu signer électroniquement le premier et me valider le second, afin que je puisse mener mon étude patrimoniale.</p>
+                            <p><br></p>
+                            ${objListC1 ? `<p><strong>2) Souhaits et projets :</strong></p><ol>${objListC1}</ol>` : ''}
+                            
+                            <p>En tenant compte de tes projets et souhaits :</p>
+                            <ul><li>Épargne de précaution : ${this.form.epargneP1 || '...'} €</li>
+                            <li>Epargne mensuelle indolore : ${this.form.epargneM1 || '...'} €</li></ul>
+                            
+                            ${projListHTML ? `<ul>${projListHTML}</ul>` : ''}
+                            <p><br></p>
+                            <p><strong>3) Mises en relation :</strong></p>
+							
+                            <p>En général, les personnes satisfaites de ma démarche me mettent en relation avec 4 personnes. Je te laisse donc réfléchir à d’autres personnes concernées dans ton entourage : amis, famille, collègue et loisir.</p>
+                            <p>Lors de notre entretien, tu as déjà évoqué des personnes concernées par mon activité : ${relationText}.</p>
+                            <p>Je te propose maintenant de leur en parler, et voici quelques mots pour t’y aider :<br>
+                            <i>« Je connais quelqu’un qui m’aide dans l’organisation de l’épargne, la protection de la famille, la préparation de la retraite et la réduction d’impôts. Je me suis dit que tu serais concerné ! Si tu es d’accord, je lui communique ton numéro mobile. Comme ça, elle t’enverra un sms pour convenir d’un appel téléphonique. Elle ne t’appellera pas sans ton accord et en plus, elle ne facture aucun honoraire. »</i></p>
+                            <p>Je compte sur toi, car nous en reparlerons lors de notre prochain rendez-vous !</p>
+                            <p><br></p>
+							<p><strong>4) Prochain rendez-vous :</strong></p>
+                            <p>Je te présenterai mes recommandations le <strong>${dateFormateeR2}</strong> à <strong>${heureFormateeR2}</strong> : ${lienHTML}. </p>
+							<p><br></p>
+                            <p>Je reste bien évidemment à ta disposition pour tout complément d’information d’ici là.</p>`,
+                        'R1-CR-V': `<p><strong>Conseil patrimonial : compte-rendu du ${dateFormateeR1}</strong></p>
+							<p><br></p>
+                            <p>Bonjour ${this.form.prenom1 || '...'} et ${this.form.prenom2 || '...'},</p>
+                            <p>Vous trouverez ci-après les différents points abordés lors de notre entretien :</p>
+                            <p><br></p>
+							<p><strong>1) Situation actuelle :</strong></p>
+                            <ul>
+                                <li><strong>Document Entrée en Relation :</strong> document réglementaire, que vous allez également recevoir en signature électronique "Votre consultant vous invite à signer des documents". Attention, il peut se trouver dans les spams.</li>
+                                <li><strong>Recueil d’informations :</strong> récapitulatif de nos échanges, à relire pour apporter des compléments le cas échéant.</li>
+                            </ul>
+                            <p>Pouvez-vous signer électroniquement le premier et me valider le second, afin que je puisse mener mon étude patrimoniale.</p>
+                            <p><br></p>
+                            ${objListC1 ? `<p><strong>2) Souhaits et projets :</strong></p>
+							<p><strong>${this.form.prenom1 || '...'} :</strong><ol>${objListC1}</ol></p>` : ''}
+							${objListC2 ? `<p><strong>${this.form.prenom2 || '...'} :</strong></p>
+							<ol>${objListC2}</ol>` : ''}
+                            <p><br></p>
+                            <p>En tenant compte de vos projets et souhaits :</p>
+                            <ul><li>Épargne de précaution : ${this.form.prenom1 || '...'} : ${this.form.epargneP1 || '...'} €, ${this.form.prenom2 || '...'} : ${this.form.epargneP2 || '...'} €</li>
+                            <li>Epargne mensuelle indolore : ${this.form.prenom1 || '...'} : ${this.form.epargneM1 || '...'} €, ${this.form.prenom2 || '...'} : ${this.form.epargneM2 || '...'} €</li></ul>
+                            ${projListHTML ? `<ul>${projListHTML}</ul>` : ''}
+                            <p><br></p>
+                            <p><strong>3) Mises en relation :</strong></p>
+							
+                            <p>En général, les personnes satisfaites de ma démarche me mettent en relation avec 4 personnes. Je vous laisse donc réfléchir à d’autres personnes concernées dans votre entourage : amis, famille, collègue et loisir.</p>
+                            <p>Lors de notre entretien, vous avez déjà évoqué des personnes concernées par mon activité : ${relationText}.</p>
+                            <p>Je vous propose maintenant de leur en parler, et voici quelques mots pour vous y aider :<br>
+                            <i>« Je connais quelqu’un qui m’aide dans l’organisation de l’épargne, la protection de la famille, la préparation de la retraite et la réduction d’impôts. Je me suis dit que tu serais concerné ! Si tu es d’accord, je lui communique ton numéro mobile. Comme ça, elle t’enverra un sms pour convenir d’un appel téléphonique. Elle ne t’appellera pas sans ton accord et en plus, elle ne facture aucun honoraire. »</i></p>
+                            <p>Je compte sur vous, car nous en reparlerons lors de notre prochain rendez-vous !</p>
+                            <p><br></p>
+							<p><strong>4) Prochain rendez-vous :</strong></p>
+                            <p>Je vous présenterai mes recommandations le <strong>${dateFormateeR2}</strong> à <strong>${heureFormateeR2}</strong> : ${lienHTML}. </p>
+							<p><br></p>
+                            <p>Je reste bien évidemment à votre disposition pour tout complément d’information d’ici là.</p>`
+                    };
+
+                    // Note : J'ai raccourci les textes R1/R1-CR dans l'exemple ci-dessus pour la clarté, 
+                    // mais ils reprennent la logique HTML complète de votre fichier d'origine.
+
+                    renderZone.innerHTML = templates[this.config.type] || "Template non configuré.";
+
+                    try {
+                        const blob = new Blob([renderZone.innerHTML], { type: "text/html" });
+                        const data = [new ClipboardItem({ "text/html": blob })];
+                        await navigator.clipboard.write(data);
+                        this.copied = true;
+                        setTimeout(() => this.copied = false, 4000);
+                    } catch (err) {
+                        alert("Erreur de copie.");
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
