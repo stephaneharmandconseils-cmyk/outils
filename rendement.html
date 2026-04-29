@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur de Rendement Financier (CAGR)</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #27ae60;
+            --bg: #f4f7f6;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+        }
+        h2 {
+            color: var(--primary);
+            text-align: center;
+            margin-top: 0;
+        }
+        .input-group {
+            margin-bottom: 1.2rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .duration-row {
+            display: flex;
+            gap: 10px;
+        }
+        .result-container {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-left: 5px solid var(--accent);
+            border-radius: 4px;
+        }
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+        .result-value {
+            font-weight: bold;
+            color: var(--accent);
+            font-size: 1.2rem;
+        }
+        .info {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Analyse de Performance</h2>
+    
+    <div class="input-group">
+        <label for="initial">Capital de départ (€)</label>
+        <input type="number" id="initial" placeholder="Ex: 1000" oninput="calculer()">
+    </div>
+
+    <div class="input-group">
+        <label for="final">Capital d'arrivée (€)</label>
+        <input type="number" id="final" placeholder="Ex: 1500" oninput="calculer()">
+    </div>
+
+    <div class="input-group">
+        <label>Durée de l'investissement</label>
+        <div class="duration-row">
+            <input type="number" id="years" placeholder="Années" oninput="calculer()">
+            <input type="number" id="months" placeholder="Mois" oninput="calculer()">
+        </div>
+    </div>
+
+    <div class="result-container">
+        <div class="result-item">
+            <span>Rendement Total :</span>
+            <span id="totalReturn" class="result-value">-- %</span>
+        </div>
+        <div class="result-item">
+            <span>Rendement Annuel (CAGR) :</span>
+            <span id="annualReturn" class="result-value">-- %</span>
+        </div>
+    </div>
+
+    <p class="info">Calcul basé sur la méthode des intérêts composés.</p>
+</div>
+
+<script>
+    function calculer() {
+        const initial = parseFloat(document.getElementById('initial').value);
+        const final = parseFloat(document.getElementById('final').value);
+        const years = parseFloat(document.getElementById('years').value) || 0;
+        const months = parseFloat(document.getElementById('months').value) || 0;
+
+        const totalYears = years + (months / 12);
+
+        if (initial > 0 && final > 0 && totalYears > 0) {
+            // Calcul du rendement total brut
+            const totalReturn = ((final / initial) - 1) * 100;
+            
+            // Calcul du rendement annuel composé (CAGR)
+            const annualReturn = (Math.pow((final / initial), (1 / totalYears)) - 1) * 100;
+
+            document.getElementById('totalReturn').innerText = totalReturn.toFixed(2) + " %";
+            document.getElementById('annualReturn').innerText = annualReturn.toFixed(2) + " %";
+        } else {
+            document.getElementById('totalReturn').innerText = "-- %";
+            document.getElementById('annualReturn').innerText = "-- %";
+        }
+    }
+</script>
+
+</body>
+</html>
