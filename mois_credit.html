@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur de Crédit - Mois Restants</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #27ae60;
+            --bg: #f4f7f6;
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+        }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 1.5rem; }
+        .input-group { margin-bottom: 1.2rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #555; }
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .result-container {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: #ebf5fb;
+            border-radius: 8px;
+            border-top: 4px solid var(--accent);
+        }
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+            font-size: 1.05rem;
+        }
+        .highlight {
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .remaining-big {
+            font-size: 2rem;
+            color: var(--accent);
+            text-align: center;
+            display: block;
+            margin: 10px 0;
+        }
+        progress {
+            width: 100%;
+            height: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Suivi de mon Crédit</h2>
+    
+    <div class="input-group">
+        <label for="startDate">Date de la 1ère échéance</label>
+        <input type="date" id="startDate" oninput="calculerCredit()">
+    </div>
+
+    <div class="input-group">
+        <label for="totalMonths">Durée totale (en mois)</label>
+        <input type="number" id="totalMonths" placeholder="Ex: 240" oninput="calculerCredit()">
+    </div>
+
+    <div id="results" class="result-container" style="display:none;">
+        <div class="result-item">
+            <span>Mois restants :</span>
+        </div>
+        <span id="remainingMonths" class="remaining-big">0</span>
+        
+        <div class="result-item">
+            <span>Date de fin :</span>
+            <span id="endDate" class="highlight">--</span>
+        </div>
+        
+        <div class="result-item">
+            <span>Progression :</span>
+            <span id="progressPercent" class="highlight">0%</span>
+        </div>
+        <progress id="progressBar" value="0" max="100"></progress>
+    </div>
+</div>
+
+<script>
+    function calculerCredit() {
+        const startVal = document.getElementById('startDate').value;
+        const totalMonths = parseInt(document.getElementById('totalMonths').value);
+        const resultsDiv = document.getElementById('results');
+
+        if (!startVal || !totalMonths) {
+            resultsDiv.style.display = 'none';
+            return;
+        }
+
+        resultsDiv.style.display = 'block';
+
+        const startDate = new Date(startVal);
+        const today = new Date();
+
+        // 1. Calcul de la date de fin
+        let endDate = new Date(startDate);
+        endDate.setMonth(startDate.getMonth() + totalMonths);
+        
+        document.getElementById('endDate').innerText = endDate.toLocaleDateString('fr-FR', {
+            year: 'numeric', month: 'long'
+        });
+
+        // 2. Calcul des mois écoulés
+        let monthsElapsed = (today.getFullYear() - startDate.getFullYear()) * 12;
+        monthsElapsed += today.getMonth() - startDate.getMonth();
+        
+        // Si le jour du mois actuel est inférieur au jour de début, le mois en cours n'est pas "fini"
+        if (today.getDate() < startDate.getDate()) {
+            monthsElapsed--;
+        }
+
+        // 3. Calcul des mois restants
+        let remaining = totalMonths - monthsElapsed;
+        
+        // Gestion des cas limites (crédit fini ou pas encore commencé)
+        if (remaining < 0) remaining = 0;
+        if (remaining > totalMonths) remaining = totalMonths;
+
+        document.getElementById('remainingMonths').innerText = remaining + " mois";
+
+        // 4. Progression
+        const percent = Math.min(100, Math.max(0, ((totalMonths - remaining) / totalMonths) * 100));
+        document.getElementById('progressPercent').innerText = percent.toFixed(1) + "%";
+        document.getElementById('progressBar').value = percent;
+    }
+</script>
+
+</body>
+</html>
