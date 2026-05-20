@@ -1608,6 +1608,15 @@ function renderTable() {
         immo: { va: 0, vp: 0 }
     };
 
+	// 1. On trie le tableau contacts par ordre alphabétique du NOM de famille
+	contacts.sort((a, b) => {
+   	 const nomA = (a.nom || "").toString().toUpperCase();
+   	 const nomB = (b.nom || "").toString().toUpperCase();
+    return nomA.localeCompare(nomB, 'fr', { sensitivity: 'base' });
+	});
+
+// 2. On exécute ensuite votre boucle existante (qui est maintenant triée)
+	
     contacts.forEach(c => {
         // Calcul des totaux individuels pour les stats globales
 		const id = c.id || "ID_" + Math.random();
