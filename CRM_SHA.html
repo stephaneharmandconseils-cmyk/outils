@@ -1778,13 +1778,13 @@ function renderTable() {
                         ${c.tel || ''}<br><span class="italic">${c.email || ''}</span>
                     </td>
                     <td data-label="Montant" class="p-4">
-                        <div class="text-blue-700 font-bold">${vaIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VA</span></div>
-                        <div class="text-green-700 font-bold">${vpIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VP</span></div>
-						<div class="text-blue-700 font-bold">${valPipe.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pipe</span></div>
-                        <div class="text-green-700 font-bold">${valPipeVp.toLocaleString()} € <span class="text-[9px] text-gray-400">VP Pipe</span></div>
-						<div class="text-blue-700 font-bold">${valPot.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pot</span></div>
-                        <div class="text-blue-700 font-bold">${valPotVp.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pot</span></div>
-                    </td>
+    ${vaIndiv !== 0 ? `<div class="text-blue-700 font-bold">${vaIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VA</span></div>` : ''}
+    ${vpIndiv !== 0 ? `<div class="text-green-700 font-bold">${vpIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VP</span></div>` : ''}
+    ${valPipe !== 0 ? `<div class="text-blue-700 font-bold">${valPipe.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pipe</span></div>` : ''}
+    ${valPipeVp !== 0 ? `<div class="text-green-700 font-bold">${valPipeVp.toLocaleString()} € <span class="text-[9px] text-gray-400">VP Pipe</span></div>` : ''}
+    ${valPot !== 0 ? `<div class="text-blue-700 font-bold">${valPot.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pot</span></div>` : ''}
+    ${valPotVp !== 0 ? `<div class="text-blue-700 font-bold">${valPotVp.toLocaleString()} € <span class="text-[9px] text-gray-400">VP Pot</span></div>` : ''}
+</td>
                     <td data-label="Infos" class="p-4 text-center">
                          <div>${c.proprio === "true" || c.proprio === true ? '🏠' : ''}</div>
 						 <div>${c.notes || ''}</div>
