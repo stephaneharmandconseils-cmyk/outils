@@ -1780,6 +1780,10 @@ function renderTable() {
                     <td data-label="Montant" class="p-4">
                         <div class="text-blue-700 font-bold">${vaIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VA</span></div>
                         <div class="text-green-700 font-bold">${vpIndiv.toLocaleString()} € <span class="text-[9px] text-gray-400">VP</span></div>
+						<div class="text-blue-700 font-bold">${valPipe.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pipe</span></div>
+                        <div class="text-green-700 font-bold">${valPipeVp.toLocaleString()} € <span class="text-[9px] text-gray-400">VP Pipe</span></div>
+						<div class="text-blue-700 font-bold">${valPot.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pot</span></div>
+                        <div class="text-blue-700 font-bold">${valPotVp.toLocaleString()} € <span class="text-[9px] text-gray-400">VA Pot</span></div>
                     </td>
                     <td data-label="Infos" class="p-4 text-center">
                          <div>${c.proprio === "true" || c.proprio === true ? '🏠' : ''}</div>
