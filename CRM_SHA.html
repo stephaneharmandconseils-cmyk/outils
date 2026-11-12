@@ -1449,6 +1449,7 @@ async function saveContact() {
         fetch(SCRIPT_URL, {
             method: 'POST',
             mode: 'no-cors',
+			Content-Type: text/plain,
             body: JSON.stringify(contactData)
         }).then(() => {
         console.log("Synchronisé avec succès");
